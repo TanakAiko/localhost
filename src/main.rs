@@ -1,32 +1,40 @@
 use std::net::TcpListener;
 
+use config::load_config;
 use event_loop::EventLoop;
+pub mod config;
 pub mod event_loop;
 pub mod http_request;
 pub mod http_response;
 
 fn main() -> std::io::Result<()> {
-    let mut listener_list = Vec::new();
+    let config = load_config("config.json").expect("Failed to load configuration");
 
-    // Initiate listeners & push them to the listener_list
-    let listener = TcpListener::bind("127.0.0.1:8080")?;
-    listener.set_nonblocking(true)?;
-    println!("\nServer launch at : http://127.0.0.1:8080");
-    listener_list.push(&listener);
+    println!("\nconfig: {:?}\n", config);
 
-    let listener1 = TcpListener::bind("127.0.0.1:8082")?;
-    listener1.set_nonblocking(true)?;
-    println!("Server launch at : http://127.0.0.1:8082\n");
-    listener_list.push(&listener1);
+    for server in &config.servers {
+        // Create the event_loop for the server
+        let mut event_loop = EventLoop::new()?;
+        event_loop.route_map = server.routes.clone();
+        let mut listener_list = Vec::new();
 
-    // Create the event_loop for the server
-    let mut event_loop = EventLoop::new()?;
+        for port in &server.ports {
+            let address = format!("{}:{}", server.addr, port);
+            let listener = TcpListener::bind(&address)?;
+            listener.set_nonblocking(true)?;
+            println!("Server '{}' launched at: http://{}", server.name, address);
+            listener_list.push(listener);
+        }
 
-    // Add listeners to the server
-    for listen in listener_list.iter() {
-        event_loop.add_listener(listen)?;
+        for listen in listener_list.iter() {
+            event_loop.add_listener(listen)?;
+        }
+
+        // Run the server
+        if let Err(e) = event_loop.run(listener_list) {
+            eprintln!("Error running server '{}': {:?}", server.name, e);
+        }
     }
 
-    // Run the server
-    event_loop.run(listener_list)
+    Ok(())
 }

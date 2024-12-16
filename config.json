@@ -1,0 +1,17 @@
+{
+    "servers": [
+        {
+            "name": "myLocalhost",
+            "addr": "127.0.0.1",
+            "ports": [
+                "8080",
+                "8082"
+            ],
+            "routes": {
+                "/": "Hello World!",
+                "/about": "This is the about page.",
+                "/contact": "Contact us at example@example.com."
+            }
+        }
+    ]
+}

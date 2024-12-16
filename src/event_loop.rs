@@ -10,6 +10,7 @@ use crate::{http_request::HttpRequest, http_response::HttpResponse};
 pub struct EventLoop {
     epoll_fd: RawFd,
     connections: HashMap<RawFd, TcpStream>,
+    pub route_map: HashMap<String, String>,
 }
 
 impl EventLoop {
@@ -22,11 +23,12 @@ impl EventLoop {
         Ok(Self {
             epoll_fd,
             connections: HashMap::new(),
+            route_map: HashMap::new(),
         })
     }
 
     // Add a new listener (port) to handle by the server
-    pub fn add_listener(&self, listener: &TcpListener) -> std::io::Result<()> {
+    pub fn add_listener(&mut self, listener: &TcpListener) -> std::io::Result<()> {
         let mut event = libc::epoll_event {
             events: (libc::EPOLLIN | libc::EPOLLET) as u32,
             u64: listener.as_raw_fd() as u64,
@@ -49,7 +51,7 @@ impl EventLoop {
     }
 
     // Run the server
-    pub fn run(&mut self, listeners: Vec<&TcpListener>) -> std::io::Result<()> {
+    pub fn run(&mut self, listeners: Vec<TcpListener>) -> std::io::Result<()> {
         let mut events = vec![libc::epoll_event { events: 0, u64: 0 }; 1024];
 
         loop {
@@ -122,13 +124,14 @@ impl EventLoop {
                 // Get a new request
                 let request_raw = String::from_utf8_lossy(&buffer[..n]);
                 if let Some(request) = HttpRequest::from_raw(&request_raw) {
-                    println!("--------------- New request ---------------\n{:?}\n", request);
+                    println!(
+                        "--------------- New request ---------------\n{:?}\n",
+                        request
+                    );
 
-                    let response = match request.path.as_str() {
-                        "/" => HttpResponse::ok("Hello, World!"),
-                        "/about" => HttpResponse::ok("This is the about page."),
-                        "/contact" => HttpResponse::ok("Contact us at example@example.com."),
-                        _ => HttpResponse::not_found(),
+                    let response = match self.route_map.get(&request.path) {
+                        Some(message) => HttpResponse::ok(message),
+                        None => HttpResponse::not_found(),
                     };
 
                     stream.write_all(response.to_string().as_bytes())?;
