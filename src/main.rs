@@ -1,4 +1,4 @@
-use std::net::TcpListener;
+use std::{collections::HashSet, net::TcpListener};
 
 use config::load_config;
 use event_loop::EventLoop;
@@ -10,30 +10,43 @@ pub mod http_response;
 fn main() -> std::io::Result<()> {
     let config = load_config("config.json").expect("Failed to load configuration");
 
-    println!("\nconfig: {:?}\n", config);
+    //println!("\nconfig: {:?}\n", config);
+    let mut event_loop = EventLoop::new()?;
+    let mut listener_list = Vec::new();
+    let mut server_names = HashSet::new();
+    let mut addresses = HashSet::new();
 
     for server in &config.servers {
-        // Create the event_loop for the server
-        let mut event_loop = EventLoop::new()?;
-        event_loop.route_map = server.routes.clone();
-        let mut listener_list = Vec::new();
+        // Check if there's two server with the same name
+        if !server_names.insert(&server.name) {
+            eprintln!("Error: Duplicate server name '{}'", server.name);
+            std::process::exit(1);
+        }
 
         for port in &server.ports {
             let address = format!("{}:{}", server.addr, port);
+
+            // Check if there's two listener with the same addresses
+            if !addresses.insert(address.clone()) {
+                eprintln!(
+                    "Error: Duplicate address '{}' for server '{}'",
+                    address, server.name
+                );
+                std::process::exit(1);
+            }
+
             let listener = TcpListener::bind(&address)?;
             listener.set_nonblocking(true)?;
             println!("Server '{}' launched at: http://{}", server.name, address);
+            event_loop.add_listener(&listener, server.name.clone(), server.routes.clone())?;
             listener_list.push(listener);
         }
+    }
 
-        for listen in listener_list.iter() {
-            event_loop.add_listener(listen)?;
-        }
+    //println!("listener_list: {:?}", listener_list);
 
-        // Run the server
-        if let Err(e) = event_loop.run(listener_list) {
-            eprintln!("Error running server '{}': {:?}", server.name, e);
-        }
+    if let Err(e) = event_loop.run(listener_list) {
+        eprintln!("Error running server: {:?}", e);
     }
 
     Ok(())

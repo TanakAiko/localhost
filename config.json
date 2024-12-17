@@ -12,6 +12,16 @@
                 "/about": "This is the about page.",
                 "/contact": "Contact us at example@example.com."
             }
+        },
+        {
+            "name": "sever_num_2",
+            "addr": "127.0.0.1",
+            "ports": [
+                "8083"
+            ],
+            "routes": {
+                "/": "Hello he other World!"
+            }
         }
     ]
 }
