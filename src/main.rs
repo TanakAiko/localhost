@@ -9,7 +9,6 @@ pub mod http_response;
 
 fn main() -> std::io::Result<()> {
     let config = load_config("config.json").expect("Failed to load configuration");
-
     //println!("\nconfig: {:?}\n", config);
     let mut event_loop = EventLoop::new()?;
     let mut listener_list = Vec::new();
@@ -19,8 +18,8 @@ fn main() -> std::io::Result<()> {
     for server in &config.servers {
         // Check if there's two server with the same name
         if !server_names.insert(&server.name) {
-            eprintln!("Error: Duplicate server name '{}'", server.name);
-            std::process::exit(1);
+            eprintln!("Ignore: Duplicate server name '{}'", server.name);
+            continue;
         }
 
         for port in &server.ports {
@@ -29,10 +28,10 @@ fn main() -> std::io::Result<()> {
             // Check if there's two listener with the same addresses
             if !addresses.insert(address.clone()) {
                 eprintln!(
-                    "Error: Duplicate address '{}' for server '{}'",
+                    "Ignore: Duplicate address '{}' for server '{}'",
                     address, server.name
                 );
-                std::process::exit(1);
+                continue;
             }
 
             let listener = TcpListener::bind(&address)?;
