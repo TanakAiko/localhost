@@ -124,8 +124,12 @@ impl HttpResponse {
     fn reason_phrase(&self) -> &str {
         match self.status_code {
             200 => "OK",
-            404 => "Not Found",
             400 => "Bad Request",
+            403 => "Forbidden",
+            404 => "Not Found",
+            405 => "Method Not Allowed",
+            413 => "Payload Too Large",
+            500 => "Internal Server Error",
             _ => "Unknown",
         }
     }
