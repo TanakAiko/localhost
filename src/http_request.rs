@@ -19,7 +19,6 @@ impl HttpRequest {
         let method = parts.next()?.to_string();
         let path = parts.next()?.to_string();
         let version = parts.next()?.to_string();
-
         // 2. Parse headers
         let mut headers = HashMap::new();
         for line in lines.by_ref() {

@@ -15,8 +15,8 @@
             }
         },
         {
-            "name": "myLocalhost",
-            "addr": "127.0.0.1",
+            "name": "myLocalhostas",
+            "addr": "127.  0.  0.  1",
             "ports": [
                 "8080",
                 "8082"
