@@ -9,7 +9,6 @@ pub mod http_response;
 
 fn main() -> std::io::Result<()> {
     let config = load_config("config.json").expect("Failed to load configuration");
-    //println!("\nconfig: {:?}\n", config);
     let mut event_loop = EventLoop::new()?;
     let mut listener_list = Vec::new();
     let mut server_names = HashSet::new();
@@ -41,8 +40,6 @@ fn main() -> std::io::Result<()> {
             listener_list.push(listener);
         }
     }
-
-    //println!("listener_list: {:?}", listener_list);
 
     if let Err(e) = event_loop.run(listener_list) {
         eprintln!("Error running server: {:?}", e);
