@@ -24,7 +24,7 @@ pub fn load_config(file_path: &str) -> io::Result<Config> {
     Ok(config)
 }
 
- impl Config {
+impl Config {
     // To run all valide config in our server
     pub fn start(&self) -> std::io::Result<()> {
         let mut event_loop = EventLoop::new()?;
@@ -34,14 +34,8 @@ pub fn load_config(file_path: &str) -> io::Result<Config> {
 
         for server in &self.servers {
             // Check if there's two server with the same name
-            
-            if !server.valide_ip() {
-                eprintln!("Error this ip adress is not valide '{}'", server.addr);
-                continue;
-            }
-
             if !server_names.insert(&server.name) {
-                eprintln!("Ignore: Duplicate server name '{}'", server.name);
+                eprintln!("IGNORE: Duplicate server name '{}'", server.name);
                 continue;
             }
             for port in &server.ports {
@@ -50,13 +44,23 @@ pub fn load_config(file_path: &str) -> io::Result<Config> {
                 // Check if there's two listener with the same addresses
                 if !addresses.insert(address.clone()) {
                     eprintln!(
-                        "Ignore: Duplicate address '{}' for server '{}'",
+                        "IGNORE: Duplicate address '{}' for server '{}'",
                         address, server.name
                     );
                     continue;
                 }
 
-                let listener = TcpListener::bind(&address)?;
+                let listener = match TcpListener::bind(&address) {
+                    Ok(listener) => listener,
+                    Err(_) => {
+                        eprintln!(
+                            "IGNORE: Failed to bind to address '{}' for server '{}'",
+                            address, server.name
+                        );
+                        continue;
+                    }
+                };
+
                 listener.set_nonblocking(true)?;
                 println!("Server '{}' launched at: http://{}", server.name, address);
                 event_loop.add_listener(&listener, server.name.clone(), server.routes.clone())?;
@@ -65,29 +69,8 @@ pub fn load_config(file_path: &str) -> io::Result<Config> {
         }
 
         if let Err(e) = event_loop.run(listener_list) {
-            eprintln!("Error running server: {:?}", e);
+            eprintln!("ERROR: running server: {:?}", e);
         };
         Ok(())
     }
-
-    
-}
-
-impl ServerConfig {
-
-    pub fn valide_ip(&self) -> bool {
-        let all_bytes: Vec<&str> = self.addr.split(".").collect();
-        all_bytes.len() == 4
-    }
-
-    // pub fn validate_ports(&self) -> HashMap<&String,bool> {
-    //     let mut all_valide_ports = HashMap::new();
-    //     for port in &self.ports {
-    //         match port.parse::<i32>() {
-    //             Ok(_) => all_valide_ports.insert(port, true),
-    //             Err(_) =>  all_valide_ports.insert(port, false)
-    //         };
-    //     };
-    //     all_valide_ports
-    // }
 }
