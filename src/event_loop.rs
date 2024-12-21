@@ -153,13 +153,17 @@ impl EventLoop {
                         "\n--------------- New request ---------------\n{:?}\n",
                         request
                     );
-
-                    //println!("\n\nserver.route_map: {:?}\n", server.route_map);
-
+                    
                     let response = match routes.get(&request.path) {
-                        Some(message) => HttpResponse::ok(message),
+                        Some(message) => HttpResponse::ok(request, message),
+                        None if request.path == "/style.css" => HttpResponse::get_static(request),
                         None => HttpResponse::not_found(),
                     };
+
+                    println!(
+                        "\n--------------- Response ---------------\n{:?}\n",
+                        response
+                    );
 
                     stream.write_all(response.to_string().as_bytes())?;
                 } else {
