@@ -5,7 +5,7 @@ use std::{
     os::fd::{AsRawFd, RawFd},
 };
 
-use crate::{http_request::HttpRequest, http_response::HttpResponse};
+use crate::{config::RouteConfig, http_request::HttpRequest, http_response::HttpResponse};
 
 #[derive(Debug)]
 pub struct EventLoop {
@@ -17,7 +17,7 @@ pub struct EventLoop {
 #[derive(Debug)]
 pub struct Server {
     pub listeners: Vec<RawFd>,
-    pub route_map: HashMap<String, String>,
+    pub route_map: HashMap<String, RouteConfig>,
 }
 
 impl EventLoop {
@@ -39,7 +39,7 @@ impl EventLoop {
         &mut self,
         listener: &TcpListener,
         server_name: String,
-        routes: HashMap<String, String>,
+        routes: HashMap<String, RouteConfig>,
     ) -> std::io::Result<()> {
         let mut event = libc::epoll_event {
             events: (libc::EPOLLIN | libc::EPOLLET) as u32,
@@ -133,7 +133,7 @@ impl EventLoop {
     fn handle_connection(
         &mut self,
         stream: &mut TcpStream,
-        routes: HashMap<String, String>,
+        routes: HashMap<String, RouteConfig>,
     ) -> std::io::Result<()> {
         //self.add_stream(stream)?;
 
@@ -177,7 +177,7 @@ impl EventLoop {
         }
     }
 
-    fn route_map(&self, fd: RawFd) -> HashMap<String, String> {
+    fn route_map(&self, fd: RawFd) -> HashMap<String, RouteConfig> {
         self.servers
             .values()
             .find(|server| server.listeners.contains(&fd))

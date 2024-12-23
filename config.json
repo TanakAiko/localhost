@@ -1,40 +1,60 @@
 {
     "servers": [
         {
-            "name": "myLocalhost",
+            "name": "Server1",
             "addr": "127.0.0.1",
-            "ports": [
-                "8080",
-                "8082",
-                "8082"
-            ],
+            "ports": [8080, 8081],
+            "error_pages": {
+                "404": "/var/www/html/errors/404.html",
+                "500": "/var/www/html/errors/500.html"
+            },
+            "client_body_size_limit": 1048576,
             "routes": {
-                "/": "Hello World!",
-                "/about": "This is the about page.",
-                "/contact": "Contact us at example@example.com."
+                "/": {
+                    "accepted_methods": ["GET", "POST"],
+                    "root": "/var/www/html",
+                    "default_file": "index.html",
+                    "directory_listing": false
+                },
+                "/cgi-bin/script.py": {
+                    "accepted_methods": ["GET", "POST"],
+                    "cgi": "/usr/bin/python3",
+                    "directory_listing": false
+                },
+                "/redirect": {
+                    "redirection": "/new-location"
+                },
+                "/static": {
+                    "root": "/var/www/static",
+                    "directory_listing": true
+                }
             }
         },
         {
-            "name": "myLocalhostas",
-            "addr": "127.  0.  0.  1",
-            "ports": [
-                "8080",
-                "8082"
-            ],
-            "routes": {
-                "/": "Hello World!",
-                "/about": "This is the about page.",
-                "/contact": "Contact us at example@example.com."
-            }
-        },
-        {
-            "name": "sever_num_2",
+            "name": "Server2",
             "addr": "127.0.0.1",
-            "ports": [
-                "8083"
-            ],
+            "ports": [8082],
+            "error_pages": {
+                "404": "/var/www/errors/404.html"
+            },
+            "client_body_size_limit": 5242880,
             "routes": {
-                "/": "Hello he other World!"
+                "/": {
+                    "accepted_methods": ["GET"],
+                    "root": "/var/www/server2",
+                    "default_file": "home.html",
+                    "directory_listing": false
+                },
+                "/uploads": {
+                    "accepted_methods": ["POST"],
+                    "root": "/var/www/uploads",
+                    "directory_listing": false
+                },
+                "/cgi-bin/process.php": {
+                    "accepted_methods": ["POST"],
+                    "cgi": "/usr/bin/php",
+                    "directory_listing": false
+                }
             }
         }
     ]
