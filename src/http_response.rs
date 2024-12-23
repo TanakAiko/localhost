@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use crate::http_request::HttpRequest;
+use crate::{config::RouteConfig, http_request::HttpRequest};
 
 #[derive(Debug)]
 pub struct HttpResponse {
@@ -35,16 +35,27 @@ impl HttpResponse {
     }
 
     // Generate a ok_response (200 OK)
-    pub fn ok(request: HttpRequest, message: &str) -> Self {
+    pub fn ok(request: HttpRequest, route_config: &RouteConfig) -> Self {
         match request.path.as_str() {
-            "/" => Self::page_server("./public/index.html"),
+            "/" => {
+                let methodes = match route_config.accepted_methods.clone() {
+                    Some(methode) => methode,
+                    None => return Self::bad_request()
+                };
+
+                if !methodes.contains(&request.method) {
+                    return Self::bad_request();
+                }
+                
+                Self::page_server("./public/index.html")
+            },
             _ => Self {
                 status_code: 200,
                 headers: vec![
                     ("Content-Type".to_string(), "text/html".to_string()),
-                    ("Content-Length".to_string(), message.len().to_string()),
+                    ("Content-Length".to_string(), request.path.len().to_string()),
                 ],
-                body: message.to_string(),
+                body: request.path.to_string(),
             },
         }
     }

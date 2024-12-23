@@ -15,8 +15,10 @@ fn handle_route(route: &RouteConfig, path: &str, body: Option<&str>) -> String {
     }
 
     // Gérer le fichier par défaut ou le listing de répertoire
-    if route.directory_listing {
-        return list_directory(route.root.as_deref().unwrap_or("./"));
+    if let Some(listen) = route.directory_listing {
+        if listen {
+            return list_directory(route.root.as_deref().unwrap_or("./"));
+        }
     }
 
     // Autres cas: Retourner une erreur

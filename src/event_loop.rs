@@ -112,23 +112,6 @@ impl EventLoop {
         }
     }
 
-    // Handle a new connection to the server
-    /* fn add_stream(&mut self, stream: TcpStream) -> std::io::Result<()> {
-           let fd = stream.as_raw_fd();
-           let mut event = libc::epoll_event {
-               events: (libc::EPOLLIN | libc::EPOLLET) as u32,
-               u64: fd as u64,
-           };
-
-           let res = unsafe { libc::epoll_ctl(self.epoll_fd, libc::EPOLL_CTL_ADD, fd, &mut event) };
-           if res < 0 {
-               return Err(std::io::Error::last_os_error());
-           }
-
-           self.connections.insert(fd, stream.try_clone()?);
-           Ok(())
-       }
-    */
     // Handle the connection
     fn handle_connection(
         &mut self,
@@ -155,7 +138,7 @@ impl EventLoop {
                     );
                     
                     let response = match routes.get(&request.path) {
-                        Some(message) => HttpResponse::ok(request, message),
+                        Some(route_config) => HttpResponse::ok(request, route_config),
                         None if request.path == "/style.css" => HttpResponse::get_static(request),
                         None => HttpResponse::not_found(),
                     };

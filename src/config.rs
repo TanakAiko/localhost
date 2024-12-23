@@ -22,7 +22,7 @@ pub struct RouteConfig {
     pub root: Option<String>,                  // Ex: "/test" -> "/usr/Desktop"
     pub default_file: Option<String>,          // Ex: "index.html"
     pub cgi: Option<String>,                   // Ex: Extension ".py" -> "/path/to/python"
-    pub directory_listing: bool,
+    pub directory_listing: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
