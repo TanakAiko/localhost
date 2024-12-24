@@ -24,7 +24,7 @@ pub fn handle_post(request: HttpRequest) -> HttpResponse {
     let boundary = boundary.unwrap().clone();
 
     // Decode the body into binary
-    let body_bytes = request.body.as_bytes();
+    let body_bytes = request.body;
 
     let mut multipart = Multipart::with_body(Cursor::new(body_bytes), boundary);
 

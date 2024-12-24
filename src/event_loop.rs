@@ -135,20 +135,17 @@ impl EventLoop {
         while buffer.len() < content_length {
             let bytes_read = stream.read(&mut temp_buffer)?;
             if bytes_read == 0 {
-                break; // Connexion fermée
+                break;
             }
             buffer.extend_from_slice(&temp_buffer[..bytes_read]);
         }
 
         // Get a new request
-        let request_raw = String::from_utf8_lossy(&buffer);
-        if let Some(request) = HttpRequest::from_raw(&request_raw) {
+        if let Some(request) = HttpRequest::from_raw(&buffer) {
             println!(
                 "\n--------------- New request ---------------\n{:?}\n",
                 request
             );
-
-            println!("*********************body_len: {}", request.body.len());
 
             let response = match routes.get(&request.path) {
                 Some(route_config) => HttpResponse::ok(request, route_config),
