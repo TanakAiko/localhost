@@ -16,6 +16,7 @@ pub struct EventLoop {
 
 #[derive(Debug)]
 pub struct Server {
+    pub name: String,
     pub listeners: Vec<RawFd>,
     pub route_map: HashMap<String, RouteConfig>,
 }
@@ -32,6 +33,25 @@ impl EventLoop {
             //connections: HashMap::new(),
             servers: HashMap::new(),
         })
+    }
+
+    pub fn add_server(&mut self, server_name: String, routes: HashMap<String, RouteConfig>) {
+        if self.servers.contains_key(&server_name) {
+            eprintln!(
+                "Server with name '{}' already exists. Skipping addition.",
+                server_name
+            );
+            return;
+        }
+
+        self.servers.insert(
+            server_name.clone(),
+            Server {
+                name: server_name,
+                listeners: Vec::new(),
+                route_map: routes,
+            },
+        );
     }
 
     // Add a new listener (port) to handle by the server
@@ -55,12 +75,15 @@ impl EventLoop {
             )
         };
 
-        let server = self.servers.entry(server_name).or_insert(Server {
+        let server = self.servers.entry(server_name.clone()).or_insert(Server {
+            name: server_name,
             listeners: Vec::new(),
             route_map: routes,
         });
 
+        //println!("\nlistener.as_raw_fd(): {}", listener.as_raw_fd());
         server.listeners.push(listener.as_raw_fd());
+        //println!("server.listeners: {:?}\n", server.listeners);
 
         //self.listeners.insert(listener.as_raw_fd(), routes);
 
@@ -76,8 +99,9 @@ impl EventLoop {
         let mut events = vec![libc::epoll_event { events: 0, u64: 0 }; 1024];
 
         loop {
-            //println!("\nAll Servers: \n{:?}\n", self);
-
+            for ser in self.servers.iter() {
+                println!("\n\nServer: \n{:?}\n\n", ser);
+            }
             let num_events = unsafe {
                 libc::epoll_wait(self.epoll_fd, events.as_mut_ptr(), events.len() as i32, -1)
             };
@@ -97,8 +121,8 @@ impl EventLoop {
                         match listener.accept() {
                             Ok((mut stream, _addr)) => {
                                 //println!("New request from: {:?}", addr);
-                                let routes = self.route_map(event_fd);
-                                if let Err(e) = self.handle_connection(&mut stream, routes) {
+                                //let routes = self.route_map(event_fd);
+                                if let Err(e) = self.handle_connection(&mut stream, event_fd) {
                                     eprintln!("Error handling connection: {:?}", e);
                                     //self.connections.remove(&event_fd);
                                 }
@@ -113,11 +137,7 @@ impl EventLoop {
     }
 
     // Handle the connection
-    fn handle_connection(
-        &mut self,
-        stream: &mut TcpStream,
-        routes: HashMap<String, RouteConfig>,
-    ) -> std::io::Result<()> {
+    fn handle_connection(&mut self, stream: &mut TcpStream, fd: RawFd) -> std::io::Result<()> {
         //self.add_stream(stream)?;
 
         let mut buffer = Vec::new(); // Utilisation d'un vecteur dynamique pour accumuler les données
@@ -147,6 +167,14 @@ impl EventLoop {
                 request
             );
 
+            let hostname = request
+                .headers
+                .get("Host")
+                .map(|h| h.to_string())
+                .unwrap_or_else(|| "".to_string());
+
+            let routes = Self::route_map(&self, fd, hostname);
+
             let response = match routes.get(&request.path) {
                 Some(route_config) => HttpResponse::ok(request, route_config),
                 None if request.path == "/style.css" => HttpResponse::get_static(request),
@@ -167,7 +195,19 @@ impl EventLoop {
         Ok(())
     }
 
-    fn route_map(&self, fd: RawFd) -> HashMap<String, RouteConfig> {
+    fn route_map(&self, fd: RawFd, hostname: String) -> HashMap<String, RouteConfig> {
+        let host = hostname.split_once(":").unwrap_or(("", "")).0;
+
+        if let Some(server) = self
+            .servers
+            .values()
+            .find(|server| server.name.to_lowercase() == host)
+        {
+            //println!("routes from host");
+            return server.route_map.clone();
+        }
+
+        //println!("routes from fd");
         self.servers
             .values()
             .find(|server| server.listeners.contains(&fd))

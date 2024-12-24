@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::net::TcpListener;
-use std::{fs, io, os::fd::{AsRawFd, RawFd},};
+use std::process::Command;
+use std::{
+    fs, io,
+    os::fd::{AsRawFd, RawFd},
+};
 
 use crate::event_loop::EventLoop;
-
-
 
 use libc::{fcntl, F_GETFL, F_SETFL, O_NONBLOCK};
 
@@ -16,7 +18,7 @@ pub struct ServerConfig {
     pub ports: Vec<String>,
     pub routes: HashMap<String, RouteConfig>,
     pub error_pages: Option<HashMap<u16, String>>, // Ex: 404 -> "/path/to/404.html"
-    pub client_body_size_limit: Option<usize>, // Ex: Limite d'upload en octets
+    pub client_body_size_limit: Option<usize>,     // Ex: Limite d'upload en octets
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -40,7 +42,6 @@ pub fn load_config(file_path: &str) -> io::Result<Config> {
     Ok(config)
 }
 
-
 fn set_non_blocking(fd: RawFd) -> std::io::Result<()> {
     let flags = unsafe { fcntl(fd, F_GETFL) };
     if flags < 0 {
@@ -59,7 +60,8 @@ impl Config {
         let mut event_loop = EventLoop::new()?;
         let mut listener_list = Vec::new();
         let mut server_names = HashSet::new();
-        let mut addresses = HashSet::new();
+        let mut server_addresses = Vec::new();
+        //let mut addesses = Vec::new();
 
         for server in &self.servers {
             // Check if there's two server with the same name
@@ -70,28 +72,51 @@ impl Config {
             for port in &server.ports {
                 let address = format!("{}:{}", server.addr, port);
 
-                // Check if there's two listener with the same addresses
-                if !addresses.insert(address.clone()) {
+                // Check if there's two listener with the same addresses within the same server
+                if server_addresses.contains(&(server.name.clone(), address.clone())) {
                     eprintln!(
-                        "IGNORE: Duplicate address '{}' for server '{}'",
+                        "IGNORE: Address '{}' for server '{}' already exists.",
                         address, server.name
                     );
                     continue;
                 }
 
+                server_addresses.push((server.name.clone(), address.clone()));
+
+                //if addesses.contains(address) {}
+
                 let listener = match TcpListener::bind(&address) {
                     Ok(listener) => listener,
-                    Err(_) => {
-                        eprintln!(
-                            "IGNORE: Failed to bind to address '{}' for server '{}'",
-                            address, server.name
-                        );
+                    Err(err) => {
+                        match err.kind() {
+                            std::io::ErrorKind::AddrInUse => {
+                                Self::add_to_hosts(&server.name, &server.addr)?;
+                                println!(
+                                    "Server '{}' launched at: http://{}",
+                                    server.name, address
+                                );
+                                event_loop.add_server(server.name.clone(), server.routes.clone());
+                            }
+                            std::io::ErrorKind::AddrNotAvailable => {
+                                eprintln!(
+                                    "IGNORE: Address '{}' for server '{}' is not valid or not available.",
+                                    address, server.name
+                                );
+                            }
+                            _ => {
+                                eprintln!(
+                                    "IGNORE: Failed to bind to address '{}' for server '{}' due to: {:?}",
+                                    address, server.name, err
+                                );
+                            }
+                        }
                         continue;
                     }
                 };
 
                 set_non_blocking(listener.as_raw_fd())?;
-                
+
+                Self::add_to_hosts(&server.name, &server.addr)?;
                 println!("Server '{}' launched at: http://{}", server.name, address);
                 let routes = server.routes.clone();
                 event_loop.add_listener(&listener, server.name.clone(), routes)?;
@@ -99,9 +124,45 @@ impl Config {
             }
         }
 
+        //println!("server_addresses: {:?}", server_addresses);
         if let Err(e) = event_loop.run(listener_list) {
             eprintln!("ERROR: running server: {:?}", e);
         };
+        Ok(())
+    }
+
+    fn add_to_hosts(name: &str, ip: &str) -> io::Result<()> {
+        let hosts_path = "/etc/hosts";
+        let entry = format!("{} {}", ip, name);
+
+        // Read the content of the hosts file
+        let content = fs::read_to_string(hosts_path)?;
+
+        // Check if the mapping already exists
+        if content.lines().any(|line| line.trim() == entry) {
+            //println!("Mapping {} to {} already exists in hosts file.", name, ip);
+            return Ok(());
+        }
+
+        // Add the mapping using sudo
+        let output = Command::new("sudo")
+            .arg("sh")
+            .arg("-c")
+            .arg(format!("echo '{}' >> {}", entry, hosts_path))
+            .output()?;
+
+        if !output.status.success() {
+            eprintln!(
+                "Failed to add to hosts file: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Failed to execute sudo command",
+            ));
+        }
+
+        //println!("Mapping {} to {} added to hosts file.", name, ip);
         Ok(())
     }
 }

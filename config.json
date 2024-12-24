@@ -51,7 +51,8 @@
             "name": "Server2",
             "addr": "127.0.0.1",
             "ports": [
-                "8082"
+                "8082",
+                "8080"
             ],
             "error_pages": {
                 "404": "/var/www/errors/404.html"

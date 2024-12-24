@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use crate::{config::RouteConfig, http_request::HttpRequest, file_upload::handle_post};
+use crate::{config::RouteConfig, file_upload::handle_post, http_request::HttpRequest};
 
 #[derive(Debug)]
 pub struct HttpResponse {
@@ -36,31 +36,18 @@ impl HttpResponse {
 
     // Generate a ok_response (200 OK)
     pub fn ok(request: HttpRequest, route_config: &RouteConfig) -> Self {
+        let methodes = match route_config.accepted_methods.clone() {
+            Some(methode) => methode,
+            None => return Self::bad_request(),
+        };
+
+        if !methodes.contains(&request.method) {
+            return Self::bad_request();
+        }
+
         match request.path.as_str() {
-            "/" => {
-                let methodes = match route_config.accepted_methods.clone() {
-                    Some(methode) => methode,
-                    None => return Self::bad_request()
-                };
-
-                if !methodes.contains(&request.method) {
-                    return Self::bad_request();
-                }
-                
-                Self::page_server("./public/index.html")
-            },
-            "/uploading" => {
-                let methodes = match route_config.accepted_methods.clone() {
-                    Some(methode) => methode,
-                    None => return Self::bad_request()
-                };
-
-                if !methodes.contains(&request.method) {
-                    return Self::bad_request();
-                }
-                
-                Self::handle_post_response(request)
-            },
+            "/" => Self::page_server("./public/index.html"),
+            "/uploading" => Self::handle_post_response(request),
             _ => Self {
                 status_code: 200,
                 headers: vec![
@@ -73,15 +60,13 @@ impl HttpResponse {
     }
 
     //im handling post here
-    pub fn handle_post_response(
-        request: HttpRequest
-    ) -> Self {
+    pub fn handle_post_response(request: HttpRequest) -> Self {
         const MAX_BODY_SIZE: usize = 1024 * 1024; //1MB
-    
+
         if request.body.len() > MAX_BODY_SIZE {
-            return Self::payload_too_large()
+            return Self::payload_too_large();
         };
-    
+
         handle_post(request)
     }
 
