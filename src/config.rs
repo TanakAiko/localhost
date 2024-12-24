@@ -1,9 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::net::TcpListener;
-use std::{fs, io};
+use std::{fs, io, os::fd::{AsRawFd, RawFd},};
 
 use crate::event_loop::EventLoop;
+
+
+
+use libc::{fcntl, F_GETFL, F_SETFL, O_NONBLOCK};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ServerConfig {
@@ -34,6 +38,19 @@ pub fn load_config(file_path: &str) -> io::Result<Config> {
     let config_data = fs::read_to_string(file_path)?;
     let config: Config = serde_json::from_str(&config_data)?;
     Ok(config)
+}
+
+
+fn set_non_blocking(fd: RawFd) -> std::io::Result<()> {
+    let flags = unsafe { fcntl(fd, F_GETFL) };
+    if flags < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let res = unsafe { fcntl(fd, F_SETFL, flags | O_NONBLOCK) };
+    if res < 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
 }
 
 impl Config {
@@ -73,7 +90,8 @@ impl Config {
                     }
                 };
 
-                listener.set_nonblocking(true)?;
+                set_non_blocking(listener.as_raw_fd())?;
+                
                 println!("Server '{}' launched at: http://{}", server.name, address);
                 let routes = server.routes.clone();
                 event_loop.add_listener(&listener, server.name.clone(), routes)?;

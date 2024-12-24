@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use crate::{config::RouteConfig, http_request::HttpRequest};
+use crate::{config::RouteConfig, http_request::HttpRequest, file_upload::handle_post};
 
 #[derive(Debug)]
 pub struct HttpResponse {
@@ -49,6 +49,18 @@ impl HttpResponse {
                 
                 Self::page_server("./public/index.html")
             },
+            "/uploading" => {
+                let methodes = match route_config.accepted_methods.clone() {
+                    Some(methode) => methode,
+                    None => return Self::bad_request()
+                };
+
+                if !methodes.contains(&request.method) {
+                    return Self::bad_request();
+                }
+                
+                Self::handle_post_response(request)
+            },
             _ => Self {
                 status_code: 200,
                 headers: vec![
@@ -58,6 +70,19 @@ impl HttpResponse {
                 body: request.path.to_string(),
             },
         }
+    }
+
+    //im handling post here
+    pub fn handle_post_response(
+        request: HttpRequest
+    ) -> Self {
+        const MAX_BODY_SIZE: usize = 1024 * 1024; //1MB
+    
+        if request.body.len() > MAX_BODY_SIZE {
+            return Self::payload_too_large()
+        };
+    
+        handle_post(request)
     }
 
     // Generate a bad_request_response (400 Bad Request)
@@ -117,7 +142,7 @@ impl HttpResponse {
         }
     }
 
-    fn page_server(path: &str) -> Self {
+    pub fn page_server(path: &str) -> Self {
         let body = match fs::read_to_string(path) {
             Ok(temp) => temp,
             Err(_) => return Self::internal_server_error(),

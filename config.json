@@ -22,6 +22,14 @@
                     "default_file": "index.html",
                     "directory_listing": false
                 },
+                "/uploading": {
+                    "accepted_methods": [
+                        "POST"
+                    ],
+                    "root": "/var/www/html",
+                    "default_file": "import.html",
+                    "directory_listing": false
+                },
                 "/cgi-bin/script.py": {
                     "accepted_methods": [
                         "GET",
