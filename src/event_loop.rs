@@ -120,44 +120,54 @@ impl EventLoop {
     ) -> std::io::Result<()> {
         //self.add_stream(stream)?;
 
-        let mut buffer = [0; 1024];
-        match stream.read(&mut buffer) {
-            // The request is done and well handled
-            Ok(0) => {
-                //println!("Connection closed");
-                //self.connections.remove(&stream.as_raw_fd());
-                Ok(())
+        let mut buffer = Vec::new(); // Utilisation d'un vecteur dynamique pour accumuler les données
+        let mut temp_buffer = [0; 1024];
+
+        // Lire les données initiales (les en-têtes HTTP)
+        let bytes_read = stream.read(&mut temp_buffer)?;
+        buffer.extend_from_slice(&temp_buffer[..bytes_read]);
+
+        // Parse les en-têtes pour obtenir la longueur du corps
+        let request_raw = String::from_utf8_lossy(&buffer);
+        let content_length = Self::parse_content_length(&request_raw).unwrap_or(0);
+
+        // Si un corps est attendu, continuer à lire les données
+        while buffer.len() < content_length {
+            let bytes_read = stream.read(&mut temp_buffer)?;
+            if bytes_read == 0 {
+                break; // Connexion fermée
             }
-            Ok(n) => {
-                // Get a new request
-                let request_raw = String::from_utf8_lossy(&buffer[..n]);
-                if let Some(request) = HttpRequest::from_raw(&request_raw) {
-                    println!(
-                        "\n--------------- New request ---------------\n{:?}\n",
-                        request
-                    );
-                    
-                    let response = match routes.get(&request.path) {
-                        Some(route_config) => HttpResponse::ok(request, route_config),
-                        None if request.path == "/style.css" => HttpResponse::get_static(request),
-                        None => HttpResponse::not_found(),
-                    };
-
-                    println!(
-                        "\n--------------- Response ---------------\n{:?}\n",
-                        response
-                    );
-
-                    stream.write_all(response.to_string().as_bytes())?;
-                } else {
-                    eprintln!("Failed to parse request");
-                    stream.write_all(HttpResponse::bad_request().to_string().as_bytes())?;
-                }
-
-                Ok(())
-            }
-            Err(e) => Err(e),
+            buffer.extend_from_slice(&temp_buffer[..bytes_read]);
         }
+
+        // Get a new request
+        let request_raw = String::from_utf8_lossy(&buffer);
+        if let Some(request) = HttpRequest::from_raw(&request_raw) {
+            println!(
+                "\n--------------- New request ---------------\n{:?}\n",
+                request
+            );
+
+            println!("*********************body_len: {}", request.body.len());
+
+            let response = match routes.get(&request.path) {
+                Some(route_config) => HttpResponse::ok(request, route_config),
+                None if request.path == "/style.css" => HttpResponse::get_static(request),
+                None => HttpResponse::not_found(),
+            };
+
+            println!(
+                "\n--------------- Response ---------------\n{:?}\n",
+                response
+            );
+
+            stream.write_all(response.to_string().as_bytes())?;
+        } else {
+            eprintln!("Failed to parse request");
+            stream.write_all(HttpResponse::bad_request().to_string().as_bytes())?;
+        }
+
+        Ok(())
     }
 
     fn route_map(&self, fd: RawFd) -> HashMap<String, RouteConfig> {
@@ -166,5 +176,15 @@ impl EventLoop {
             .find(|server| server.listeners.contains(&fd))
             .map(|server| server.route_map.clone())
             .unwrap_or_default()
+    }
+
+    // Fonction pour extraire la longueur du contenu des en-têtes HTTP
+    fn parse_content_length(request: &str) -> Option<usize> {
+        for line in request.lines() {
+            if let Some(value) = line.strip_prefix("Content-Length: ") {
+                return value.trim().parse().ok();
+            }
+        }
+        None
     }
 }
