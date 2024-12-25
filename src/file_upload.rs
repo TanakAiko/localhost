@@ -3,7 +3,7 @@ use crate::http_response::HttpResponse;
 use multipart::server::Multipart;
 use std::io::Cursor;
 use std::io::Read;
-use std::{fs::File, io::Write, path::Path};
+use std::{fs::{self, File}, io::Write, path::Path};
 
 pub fn handle_post(request: HttpRequest) -> HttpResponse {
     let content_type = request
@@ -30,7 +30,14 @@ pub fn handle_post(request: HttpRequest) -> HttpResponse {
 
     while let Ok(Some(mut field)) = multipart.read_entry() {
         if let Some(file_name) = field.headers.filename.clone() {
-            let save_path = Path::new("./public/upload").join(file_name);
+            let upload_dir = Path::new("./public/upload");
+
+            if let Err(err) = fs::create_dir_all(upload_dir) {
+                eprintln!("Failed to create upload directory: {}", err);
+                return HttpResponse::internal_server_error();
+            }
+
+            let save_path = upload_dir.join(file_name);
 
             let mut file = File::create(save_path).expect("Failed to create file");
             let mut buffer = Vec::new();
