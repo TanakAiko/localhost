@@ -3,9 +3,17 @@ use crate::http_response::HttpResponse;
 use multipart::server::Multipart;
 use std::io::Cursor;
 use std::io::Read;
-use std::{fs::{self, File}, io::Write, path::Path};
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::Path,
+};
 
 pub fn handle_post(request: HttpRequest) -> HttpResponse {
+    if request.method == "GET" {
+        return HttpResponse::upload_dir();
+    }
+
     let content_type = request
         .headers
         .get("Content-Type")
@@ -17,11 +25,12 @@ pub fn handle_post(request: HttpRequest) -> HttpResponse {
     }
 
     // Extract boundary
-    let boundary = extract_boundary(&content_type);
-    if boundary.is_none() {
-        return HttpResponse::bad_request();
-    }
-    let boundary = boundary.unwrap().clone();
+    let boundary = match extract_boundary(&content_type) {
+        Some(b) => b,
+        None => return HttpResponse::bad_request()
+    };
+
+    let boundary = boundary.clone();
 
     // Decode the body into binary
     let body_bytes = request.body;
@@ -39,21 +48,25 @@ pub fn handle_post(request: HttpRequest) -> HttpResponse {
 
             let save_path = upload_dir.join(file_name);
 
-            let mut file = File::create(save_path).expect("Failed to create file");
+            let mut file = match File::create(save_path) {
+                Ok(f) => f,
+                Err(_) => return HttpResponse::bad_request(),
+            };
             let mut buffer = Vec::new();
-            field
-                .data
-                .read_to_end(&mut buffer)
-                .expect("Failed to read file");
-            file.write_all(&buffer).expect("Failed to write file");
+            if let Err(_) = field.data.read_to_end(&mut buffer) {
+                return HttpResponse::bad_request();
+            };
 
-            return HttpResponse::page_server("./public/import.html");
+            if let Err(_) = file.write_all(&buffer){
+                return HttpResponse::bad_request();
+            };
+
+            return HttpResponse::upload_dir();
         }
     }
 
     HttpResponse::bad_request()
 }
-
 
 fn extract_boundary(content_type: &str) -> Option<String> {
     content_type

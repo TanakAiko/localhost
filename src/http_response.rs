@@ -1,4 +1,9 @@
-use std::{fs, path::Path};
+use std::{
+    fs::{self},
+    path::Path,
+};
+
+use urlencoding::decode;
 
 use crate::{config::RouteConfig, file_upload::handle_post, http_request::HttpRequest};
 
@@ -6,12 +11,12 @@ use crate::{config::RouteConfig, file_upload::handle_post, http_request::HttpReq
 pub struct HttpResponse {
     pub status_code: u16,
     pub headers: Vec<(String, String)>,
-    pub body: String,
+    pub body: Vec<u8>,
 }
 
 impl HttpResponse {
     // Create a new http_response
-    pub fn new(status_code: u16, headers: Vec<(String, String)>, body: String) -> Self {
+    pub fn new(status_code: u16, headers: Vec<(String, String)>, body: Vec<u8>) -> Self {
         Self {
             status_code,
             headers,
@@ -21,13 +26,20 @@ impl HttpResponse {
 
     pub fn get_static(request: HttpRequest) -> Self {
         if let Some((mime_type, content)) = Self::serve_static_file(&request.path) {
+            //println!("content.len(): {:?}", content.len());
+
+            // let name = format!("output.{}", mime_type.split_once("/").unwrap().1);
+            // println!("name: {}", name);
+            // let mut file = File::create(name).unwrap();
+            // file.write_all(&content).unwrap();
+
             return Self {
                 status_code: 200,
                 headers: vec![
                     ("Content-Type".to_string(), mime_type),
                     ("Content-Length".to_string(), content.len().to_string()),
                 ],
-                body: String::from_utf8(content).unwrap_or_default(), // Si binaire, utilisez directement `content`.
+                body: content,
             };
         }
 
@@ -46,16 +58,32 @@ impl HttpResponse {
         }
 
         match request.path.as_str() {
-            "/" => Self::page_server("./public/index.html"),
-            "/uploading" => Self::handle_post_response(request),
-            _ => Self {
-                status_code: 200,
-                headers: vec![
-                    ("Content-Type".to_string(), "text/html".to_string()),
-                    ("Content-Length".to_string(), request.path.len().to_string()),
-                ],
-                body: request.path.to_string(),
-            },
+            //"/" => Self::page_server("./public/index.html"),
+            "/upload" => Self::handle_post_response(request),
+            _ => {
+                println!("route_config: {:?}", route_config);
+                let path_str = &format!(
+                    ".{}/{}",
+                    route_config.root.clone().unwrap_or("".to_string()),
+                    route_config.default_file.clone().unwrap_or("".to_string())
+                );
+                println!("\npath_str: {}\n", path_str);
+
+                let file_path = Path::new(path_str);
+
+                if file_path.exists() {
+                    return Self::page_server(path_str);
+                }
+
+                Self {
+                    status_code: 200,
+                    headers: vec![
+                        ("Content-Type".to_string(), "text/html".to_string()),
+                        ("Content-Length".to_string(), request.path.len().to_string()),
+                    ],
+                    body: request.path.into_bytes(),
+                }
+            }
         }
     }
 
@@ -123,8 +151,64 @@ impl HttpResponse {
                 ("Content-Type".to_string(), "text/html".to_string()),
                 ("Content-Length".to_string(), body.len().to_string()),
             ],
-            body,
+            body: body.into_bytes(),
         }
+    }
+
+    pub fn upload_dir() -> Self {
+        let template = match fs::read_to_string("./public/import.html") {
+            Ok(temp) => temp,
+            Err(_) => return Self::internal_server_error(),
+        };
+
+        let content = Self::list_upload_content();
+
+        let body = template.replace("{{content}}", &content);
+
+        Self {
+            status_code: 200,
+            headers: vec![
+                ("Content-Type".to_string(), "text/html".to_string()),
+                ("Content-Length".to_string(), body.len().to_string()),
+            ],
+            body: body.into_bytes(),
+        }
+    }
+
+    fn list_upload_content() -> String {
+        let cont = match fs::read_dir("./public/upload") {
+            Ok(entries) => {
+                let mut content = String::new();
+                for entry in entries {
+                    let entry = match entry {
+                        Ok(entry) => entry,
+                        Err(_) => return "".to_string(),
+                    };
+                    let file_name = entry.file_name();
+                    let file_name = file_name.to_string_lossy();
+
+                    let file_type = match entry.file_type() {
+                        Ok(ft) => ft,
+                        Err(_) => return "".to_string(),
+                    };
+
+                    if file_type.is_dir() {
+                        content.push_str(&format!(
+                            "<li>[Folder] <a href=\"upload/{0}/\">{0}</a></li>",
+                            file_name
+                        ));
+                    } else {
+                        content.push_str(&format!(
+                            "<li><a href=\"upload/{0}\">{0}</a></li>",
+                            file_name
+                        ));
+                    }
+                }
+                content
+            }
+            Err(_) => "".to_string(),
+        };
+        cont
     }
 
     pub fn page_server(path: &str) -> Self {
@@ -139,25 +223,30 @@ impl HttpResponse {
                 ("Content-Type".to_string(), "text/html".to_string()),
                 ("Content-Length".to_string(), body.len().to_string()),
             ],
-            body,
+            body: body.into_bytes(),
         }
     }
 
     // Generate the http_response structure to a good format to send
-    pub fn to_string(&self) -> String {
+    pub fn to_bytes(&self) -> Vec<u8> {
         let headers = self
             .headers
             .iter()
-            .map(|(k, v)| format!("{}: {}", k, v))
-            .collect::<Vec<_>>()
-            .join("\r\n");
-        format!(
-            "HTTP/1.1 {} {}\r\n{}\r\n\r\n{}",
+            .map(|(k, v)| format!("{}: {}\r\n", k, v))
+            .collect::<String>();
+
+        let response_text = format!(
+            "HTTP/1.1 {} {}\r\n{}\r\n",
             self.status_code,
             self.reason_phrase(),
-            headers,
-            self.body
-        )
+            headers
+        );
+
+        let mut response_bytes = response_text.into_bytes();
+
+        response_bytes.extend_from_slice(&self.body);
+
+        response_bytes
     }
 
     // Message corresponding to each response's status
@@ -175,7 +264,13 @@ impl HttpResponse {
     }
 
     fn serve_static_file(path: &str) -> Option<(String, Vec<u8>)> {
-        let file_path = format!("public{}", path); // Tous les fichiers statiques sont dans un dossier 'public'
+        let decoded_path = match decode(path) {
+            Ok(data) => data,
+            Err(_) => return None,
+        };
+
+        let file_path = format!("public{}", decoded_path);
+        println!("file_path: '{}'", file_path);
         if Path::new(&file_path).exists() {
             let content = fs::read(&file_path).ok()?;
             let mime_type = if path.ends_with(".css") {
@@ -184,8 +279,24 @@ impl HttpResponse {
                 "application/javascript"
             } else if path.ends_with(".html") {
                 "text/html"
-            } else {
+            } else if path.ends_with(".png") {
+                "image/png"
+            } else if path.ends_with(".jpg") || path.ends_with(".jpeg") {
+                "image/jpeg"
+            } else if path.ends_with(".gif") {
+                "image/gif"
+            } else if path.ends_with(".svg") {
+                "image/svg+xml"
+            } else if path.ends_with(".txt") {
                 "text/plain"
+            } else if path.ends_with(".pdf") {
+                "application/pdf"
+            } else if path.ends_with(".doc") || path.ends_with(".docx") {
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            } else if path.ends_with(".xls") || path.ends_with(".xlsx") {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            } else {
+                "application/octet-stream" // Type par défaut pour les fichiers inconnus
             };
             Some((mime_type.to_string(), content))
         } else {

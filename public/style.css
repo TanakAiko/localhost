@@ -35,6 +35,11 @@ body {
     font-size: 30px;
 }
 
+a {
+    text-decoration: none;
+    font-size: larger;
+}   
+
 @keyframes type {
     from {
         box-shadow: inset -3px 0px 0px #888;

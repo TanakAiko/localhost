@@ -2,6 +2,7 @@
     "servers": [
         {
             "name": "Server1",
+            "client_body_size_limit": 1048576,
             "addr": "127.0.0.1",
             "ports": [
                 "8080",
@@ -11,20 +12,19 @@
                 "404": "/var/www/html/errors/404.html",
                 "500": "/var/www/html/errors/500.html"
             },
-            "client_body_size_limit": 1048576,
             "routes": {
                 "/": {
                     "accepted_methods": [
                         "GET",
                         "POST"
                     ],
-                    "root": "/var/www/html",
+                    "root": "/public",
                     "default_file": "index.html",
                     "directory_listing": false
                 },
-                "/uploading": {
+                "/upload": {
                     "accepted_methods": [
-                        "POST"
+                        "POST", "GET"
                     ],
                     "root": "/var/www/html",
                     "default_file": "import.html",
@@ -49,6 +49,7 @@
         },
         {
             "name": "Server2",
+            "client_body_size_limit": 5242880,
             "addr": "127.0.0.1",
             "ports": [
                 "8082",
@@ -57,7 +58,6 @@
             "error_pages": {
                 "404": "/var/www/errors/404.html"
             },
-            "client_body_size_limit": 5242880,
             "routes": {
                 "/": {
                     "accepted_methods": [

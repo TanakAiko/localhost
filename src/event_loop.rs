@@ -99,9 +99,9 @@ impl EventLoop {
         let mut events = vec![libc::epoll_event { events: 0, u64: 0 }; 1024];
 
         loop {
-            for ser in self.servers.iter() {
-                println!("\n\nServer: \n{:?}\n\n", ser);
-            }
+            // for ser in self.servers.iter() {
+            //     println!("\n\nServer: \n{:?}\n\n", ser);
+            // }
             let num_events = unsafe {
                 libc::epoll_wait(self.epoll_fd, events.as_mut_ptr(), events.len() as i32, -1)
             };
@@ -175,21 +175,25 @@ impl EventLoop {
 
             let routes = Self::route_map(&self, fd, hostname);
 
+            //println!("request.path: '{}'", request.path);
             let response = match routes.get(&request.path) {
                 Some(route_config) => HttpResponse::ok(request, route_config),
-                None if request.path == "/style.css" => HttpResponse::get_static(request),
+                None if request.path == "/style.css" || request.path.starts_with("/upload") || request.path == "/favicon.ico" => {
+                    HttpResponse::get_static(request)
+                }
                 None => HttpResponse::not_found(),
             };
 
             println!(
                 "\n--------------- Response ---------------\n{:?}\n",
-                response
+                response.headers
             );
 
-            stream.write_all(response.to_string().as_bytes())?;
+            println!("response.body.len(): {}", response.body.len());
+            stream.write_all(&response.to_bytes())?;
         } else {
             eprintln!("Failed to parse request");
-            stream.write_all(HttpResponse::bad_request().to_string().as_bytes())?;
+            stream.write_all(&HttpResponse::bad_request().to_bytes())?;
         }
 
         Ok(())
