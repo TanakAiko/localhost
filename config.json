@@ -9,8 +9,8 @@
                 "8081"
             ],
             "error_pages": {
-                "404": "/var/www/html/errors/404.html",
-                "500": "/var/www/html/errors/500.html"
+                "404": "/public/errors/404.html",
+                "500": "/public/errors/500.html"
             },
             "routes": {
                 "/": {
@@ -26,8 +26,6 @@
                     "accepted_methods": [
                         "POST", "GET"
                     ],
-                    "root": "/var/www/html",
-                    "default_file": "import.html",
                     "directory_listing": false
                 },
                 "/cgi-bin/script.py": {

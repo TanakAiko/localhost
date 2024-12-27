@@ -1,6 +1,7 @@
 use crate::http_request::HttpRequest;
 use crate::http_response::HttpResponse;
 use multipart::server::Multipart;
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::io::Read;
 use std::{
@@ -9,9 +10,9 @@ use std::{
     path::Path,
 };
 
-pub fn handle_post(request: HttpRequest) -> HttpResponse {
+pub fn handle_post(request: HttpRequest, error_page: Option<HashMap<u16, String>>) -> HttpResponse {
     if request.method == "GET" {
-        return HttpResponse::upload_dir();
+        return HttpResponse::upload_dir(error_page);
     }
 
     let content_type = request
@@ -21,13 +22,13 @@ pub fn handle_post(request: HttpRequest) -> HttpResponse {
         .clone();
 
     if !content_type.starts_with("multipart/form-data;") {
-        return HttpResponse::bad_request();
+        return HttpResponse::bad_request(error_page);
     }
 
     // Extract boundary
     let boundary = match extract_boundary(&content_type) {
         Some(b) => b,
-        None => return HttpResponse::bad_request()
+        None => return HttpResponse::bad_request(error_page)
     };
 
     let boundary = boundary.clone();
@@ -43,29 +44,29 @@ pub fn handle_post(request: HttpRequest) -> HttpResponse {
 
             if let Err(err) = fs::create_dir_all(upload_dir) {
                 eprintln!("Failed to create upload directory: {}", err);
-                return HttpResponse::internal_server_error();
+                return HttpResponse::internal_server_error(error_page);
             }
 
             let save_path = upload_dir.join(file_name);
 
             let mut file = match File::create(save_path) {
                 Ok(f) => f,
-                Err(_) => return HttpResponse::bad_request(),
+                Err(_) => return HttpResponse::bad_request(error_page),
             };
             let mut buffer = Vec::new();
             if let Err(_) = field.data.read_to_end(&mut buffer) {
-                return HttpResponse::bad_request();
+                return HttpResponse::bad_request(error_page);
             };
 
             if let Err(_) = file.write_all(&buffer){
-                return HttpResponse::bad_request();
+                return HttpResponse::bad_request(error_page);
             };
 
-            return HttpResponse::upload_dir();
+            return HttpResponse::upload_dir(error_page);
         }
     }
 
-    HttpResponse::bad_request()
+    HttpResponse::bad_request(error_page)
 }
 
 fn extract_boundary(content_type: &str) -> Option<String> {

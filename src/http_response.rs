@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::{self},
     path::Path,
 };
@@ -24,7 +25,7 @@ impl HttpResponse {
         }
     }
 
-    pub fn get_static(request: HttpRequest) -> Self {
+    pub fn get_static(request: HttpRequest, error_page: Option<HashMap<u16, String>>) -> Self {
         if let Some((mime_type, content)) = Self::serve_static_file(&request.path) {
             //println!("content.len(): {:?}", content.len());
 
@@ -43,23 +44,27 @@ impl HttpResponse {
             };
         }
 
-        Self::not_found()
+        Self::not_found(error_page)
     }
 
     // Generate a ok_response (200 OK)
-    pub fn ok(request: HttpRequest, route_config: &RouteConfig) -> Self {
+    pub fn ok(
+        request: HttpRequest,
+        route_config: &RouteConfig,
+        error_page: Option<HashMap<u16, String>>,
+    ) -> Self {
         let methodes = match route_config.accepted_methods.clone() {
             Some(methode) => methode,
-            None => return Self::bad_request(),
+            None => return Self::bad_request(error_page),
         };
 
         if !methodes.contains(&request.method) {
-            return Self::bad_request();
+            return Self::bad_request(error_page);
         }
 
         match request.path.as_str() {
             //"/" => Self::page_server("./public/index.html"),
-            "/upload" => Self::handle_post_response(request),
+            "/upload" => Self::handle_post_response(request, error_page),
             _ => {
                 println!("route_config: {:?}", route_config);
                 let path_str = &format!(
@@ -72,7 +77,7 @@ impl HttpResponse {
                 let file_path = Path::new(path_str);
 
                 if file_path.exists() {
-                    return Self::page_server(path_str);
+                    return Self::page_server(200, path_str, error_page);
                 }
 
                 Self {
@@ -88,55 +93,78 @@ impl HttpResponse {
     }
 
     //im handling post here
-    pub fn handle_post_response(request: HttpRequest) -> Self {
+    pub fn handle_post_response(
+        request: HttpRequest,
+        error_page: Option<HashMap<u16, String>>,
+    ) -> Self {
         const MAX_BODY_SIZE: usize = 1024 * 1024; //1MB
 
         if request.body.len() > MAX_BODY_SIZE {
-            return Self::payload_too_large();
+            return Self::payload_too_large(error_page);
         };
 
-        handle_post(request)
+        handle_post(request, error_page)
     }
 
     // Generate a bad_request_response (400 Bad Request)
-    pub fn bad_request() -> Self {
-        Self::error_template(400, "Bad Request")
+    pub fn bad_request(error_page: Option<HashMap<u16, String>>) -> Self {
+        Self::error_template(400, "Bad Request", error_page)
     }
 
     // Generate a forbidden_response (403 Forbidden)
     //  Le serveur a compris la requête, mais refuse de l'exécuter à cause d'un manque de permissions.
-    pub fn forbidden() -> Self {
-        Self::error_template(403, "Forbidden")
+    pub fn forbidden(error_page: Option<HashMap<u16, String>>) -> Self {
+        Self::error_template(403, "Forbidden", error_page)
     }
 
     // Generate a not_found_response (404 Not Found)
-    pub fn not_found() -> Self {
-        Self::error_template(404, "Not Found")
+    pub fn not_found(error_page: Option<HashMap<u16, String>>) -> Self {
+        Self::error_template(404, "Not Found", error_page)
     }
 
     // Generate a method_not_allowed_response (405 Method Not Allowed)
     //  La méthode HTTP utilisée (GET, POST, PUT, DELETE, etc.) n'est pas autorisée pour cette ressource.
-    pub fn method_not_allowed() -> Self {
-        Self::error_template(405, "Method Not Allowed")
+    pub fn method_not_allowed(error_page: Option<HashMap<u16, String>>) -> Self {
+        Self::error_template(405, "Method Not Allowed", error_page)
     }
 
     // Generate a payload_too_large_response (413 Payload Too Large)
     // La taille du corps de la requête dépasse les limites acceptées par le serveur.
-    pub fn payload_too_large() -> Self {
-        Self::error_template(413, "Payload Too Large")
+    pub fn payload_too_large(error_page: Option<HashMap<u16, String>>) -> Self {
+        Self::error_template(413, "Payload Too Large", error_page)
     }
 
     // Generate a internal_server_error_response (500 Internal Server Error)
     // Une erreur générique lorsque le serveur rencontre un problème inattendu.
-    pub fn internal_server_error() -> Self {
-        Self::error_template(500, "Internal Server Error")
+    pub fn internal_server_error(error_page: Option<HashMap<u16, String>>) -> Self {
+        Self::error_template(500, "Internal Server Error", error_page)
     }
 
-    fn error_template(status_code: u16, message: &str) -> Self {
+    fn error_template(
+        status_code: u16,
+        message: &str,
+        error_page: Option<HashMap<u16, String>>,
+    ) -> Self {
+        if let Some(custom_routes) = error_page.clone() {
+            // println!("error_page: {:?}", error_page);
+            if let Some(custom_path) = custom_routes.get(&status_code) {
+                println!("custom_path: {:?}", custom_path);
+                let good_path = &format!(".{}", custom_path);
+                let path = Path::new(good_path);
+                if path.exists() {
+                    println!("Path EXISSSTTTTTTT");
+                    return Self::page_server(
+                        status_code,
+                        &format!(".{}", custom_path),
+                        error_page,
+                    );
+                }
+            }
+        }
         // Lire le fichier HTML
         let template = match fs::read_to_string("./public/error.html") {
             Ok(temp) => temp,
-            Err(_) => return Self::internal_server_error(),
+            Err(_) => return Self::internal_server_error(error_page),
         };
 
         // Remplacer les espaces réservés
@@ -155,10 +183,10 @@ impl HttpResponse {
         }
     }
 
-    pub fn upload_dir() -> Self {
+    pub fn upload_dir(error_page: Option<HashMap<u16, String>>) -> Self {
         let template = match fs::read_to_string("./public/import.html") {
             Ok(temp) => temp,
-            Err(_) => return Self::internal_server_error(),
+            Err(_) => return Self::internal_server_error(error_page),
         };
 
         let content = Self::list_upload_content();
@@ -211,14 +239,18 @@ impl HttpResponse {
         cont
     }
 
-    pub fn page_server(path: &str) -> Self {
+    pub fn page_server(
+        status_code: u16,
+        path: &str,
+        error_page: Option<HashMap<u16, String>>,
+    ) -> Self {
         let body = match fs::read_to_string(path) {
             Ok(temp) => temp,
-            Err(_) => return Self::internal_server_error(),
+            Err(_) => return Self::internal_server_error(error_page),
         };
 
         Self {
-            status_code: 200,
+            status_code,
             headers: vec![
                 ("Content-Type".to_string(), "text/html".to_string()),
                 ("Content-Length".to_string(), body.len().to_string()),

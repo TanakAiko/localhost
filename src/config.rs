@@ -95,7 +95,7 @@ impl Config {
                                     "Server '{}' launched at: http://{}",
                                     server.name, address
                                 );
-                                event_loop.add_server(server.name.clone(), server.routes.clone());
+                                event_loop.add_server(server.name.clone(), server.routes.clone(), server.error_pages.clone());
                             }
                             std::io::ErrorKind::AddrNotAvailable => {
                                 eprintln!(
@@ -119,7 +119,7 @@ impl Config {
                 Self::add_to_hosts(&server.name, &server.addr)?;
                 println!("Server '{}' launched at: http://{}", server.name, address);
                 let routes = server.routes.clone();
-                event_loop.add_listener(&listener, server.name.clone(), routes)?;
+                event_loop.add_listener(&listener, server.name.clone(), routes, server.error_pages.clone())?;
                 listener_list.push(listener);
             }
         }

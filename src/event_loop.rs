@@ -19,6 +19,7 @@ pub struct Server {
     pub name: String,
     pub listeners: Vec<RawFd>,
     pub route_map: HashMap<String, RouteConfig>,
+    pub error_pages: Option<HashMap<u16, String>>,
 }
 
 impl EventLoop {
@@ -35,7 +36,12 @@ impl EventLoop {
         })
     }
 
-    pub fn add_server(&mut self, server_name: String, routes: HashMap<String, RouteConfig>) {
+    pub fn add_server(
+        &mut self,
+        server_name: String,
+        routes: HashMap<String, RouteConfig>,
+        error_pages: Option<HashMap<u16, String>>,
+    ) {
         if self.servers.contains_key(&server_name) {
             eprintln!(
                 "Server with name '{}' already exists. Skipping addition.",
@@ -50,6 +56,7 @@ impl EventLoop {
                 name: server_name,
                 listeners: Vec::new(),
                 route_map: routes,
+                error_pages,
             },
         );
     }
@@ -60,6 +67,7 @@ impl EventLoop {
         listener: &TcpListener,
         server_name: String,
         routes: HashMap<String, RouteConfig>,
+        error_pages: Option<HashMap<u16, String>>,
     ) -> std::io::Result<()> {
         let mut event = libc::epoll_event {
             events: (libc::EPOLLIN | libc::EPOLLET) as u32,
@@ -79,6 +87,7 @@ impl EventLoop {
             name: server_name,
             listeners: Vec::new(),
             route_map: routes,
+            error_pages,
         });
 
         //println!("\nlistener.as_raw_fd(): {}", listener.as_raw_fd());
@@ -173,15 +182,13 @@ impl EventLoop {
                 .map(|h| h.to_string())
                 .unwrap_or_else(|| "".to_string());
 
-            let routes = Self::route_map(&self, fd, hostname);
+            let routes = Self::route_map(&self, fd, hostname.clone());
+            let error_pages = Self::get_error_pages(&self, fd, hostname);
 
             //println!("request.path: '{}'", request.path);
             let response = match routes.get(&request.path) {
-                Some(route_config) => HttpResponse::ok(request, route_config),
-                None if request.path == "/style.css" || request.path.starts_with("/upload") || request.path == "/favicon.ico" => {
-                    HttpResponse::get_static(request)
-                }
-                None => HttpResponse::not_found(),
+                Some(route_config) => HttpResponse::ok(request, route_config, error_pages),
+                None => HttpResponse::get_static(request, error_pages),
             };
 
             println!(
@@ -192,8 +199,9 @@ impl EventLoop {
             println!("response.body.len(): {}", response.body.len());
             stream.write_all(&response.to_bytes())?;
         } else {
+            let error_pages = Self::get_error_pages(&self, fd, "".to_string());
             eprintln!("Failed to parse request");
-            stream.write_all(&HttpResponse::bad_request().to_bytes())?;
+            stream.write_all(&HttpResponse::bad_request(error_pages).to_bytes())?;
         }
 
         Ok(())
@@ -217,6 +225,25 @@ impl EventLoop {
             .find(|server| server.listeners.contains(&fd))
             .map(|server| server.route_map.clone())
             .unwrap_or_default()
+    }
+
+    fn get_error_pages(&self, fd: RawFd, hostname: String) -> Option<HashMap<u16, String>> {
+        let host = hostname.split_once(":").unwrap_or(("", "")).0;
+
+        // Recherche par nom d'hôte
+        if let Some(server) = self
+            .servers
+            .values()
+            .find(|server| server.name.to_lowercase() == host)
+        {
+            return server.error_pages.clone();
+        }
+
+        // Recherche par descripteur de fichier (fd)
+        self.servers
+            .values()
+            .find(|server| server.listeners.contains(&fd))
+            .and_then(|server| server.error_pages.clone())
     }
 
     // Fonction pour extraire la longueur du contenu des en-têtes HTTP
