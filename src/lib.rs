@@ -4,3 +4,4 @@ pub mod http_request;
 pub mod http_response;
 pub mod file_upload;
 pub mod cgi;
+pub mod cgi_handler;

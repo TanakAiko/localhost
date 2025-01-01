@@ -7,6 +7,8 @@ use std::{
     os::fd::{AsRawFd, RawFd},
 };
 
+// use crate::cgi::{list_directory,handle_route};
+
 use crate::event_loop::EventLoop;
 
 use libc::{fcntl, F_GETFL, F_SETFL, O_NONBLOCK};
@@ -61,7 +63,7 @@ impl Config {
         let mut listener_list = Vec::new();
         let mut server_names = HashSet::new();
         let mut server_addresses = Vec::new();
-        //let mut addesses = Vec::new();
+        // let mut addesses = Vec::new();
 
         for server in &self.servers {
             // Check if there's two server with the same name
@@ -69,6 +71,7 @@ impl Config {
                 eprintln!("IGNORE: Duplicate server name '{}'", server.name);
                 continue;
             }
+
             for port in &server.ports {
                 let address = format!("{}:{}", server.addr, port);
 
@@ -83,7 +86,6 @@ impl Config {
 
                 server_addresses.push((server.name.clone(), address.clone()));
 
-                //if addesses.contains(address) {}
 
                 let listener = match TcpListener::bind(&address) {
                     Ok(listener) => listener,
@@ -124,7 +126,6 @@ impl Config {
             }
         }
 
-        //println!("server_addresses: {:?}", server_addresses);
         if let Err(e) = event_loop.run(listener_list) {
             eprintln!("ERROR: running server: {:?}", e);
         };

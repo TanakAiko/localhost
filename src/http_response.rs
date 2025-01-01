@@ -6,8 +6,7 @@ use std::{
 
 use urlencoding::decode;
 
-use crate::{config::RouteConfig, file_upload::handle_post, http_request::HttpRequest};
-
+use crate::{cgi::handle_route, config::RouteConfig, file_upload::handle_post, http_request::HttpRequest};
 #[derive(Debug)]
 pub struct HttpResponse {
     pub status_code: u16,
@@ -65,33 +64,20 @@ impl HttpResponse {
         match request.path.as_str() {
             //"/" => Self::page_server("./public/index.html"),
             "/upload" => Self::handle_post_response(request, error_page),
-            _ => {
-                println!("route_config: {:?}", route_config);
-                let path_str = &format!(
-                    ".{}/{}",
-                    route_config.root.clone().unwrap_or("".to_string()),
-                    route_config.default_file.clone().unwrap_or("".to_string())
-                );
-                println!("\npath_str: {}\n", path_str);
-
-                let file_path = Path::new(path_str);
-
-                if file_path.exists() {
-                    return Self::page_server(200, path_str, error_page);
-                }
-
-                Self {
-                    status_code: 200,
-                    headers: vec![
-                        ("Content-Type".to_string(), "text/html".to_string()),
-                        ("Content-Length".to_string(), request.path.len().to_string()),
-                    ],
-                    body: request.path.into_bytes(),
-                }
-            }
+            _ => handle_route(route_config, request, error_page)
         }
     }
 
+    pub fn from_cgi_output(output: Vec<u8>, error_page: Option<HashMap<u16, String>>) -> Self {
+        match String::from_utf8(output) {
+            Ok(body) => HttpResponse {
+                status_code: 200,
+                headers: vec![("Content-Type".to_string(), "text/html".to_string())],
+                body: body.into(),
+            },
+            Err(_) => HttpResponse::internal_server_error(error_page)
+        }
+    }
     //im handling post here
     pub fn handle_post_response(
         request: HttpRequest,
