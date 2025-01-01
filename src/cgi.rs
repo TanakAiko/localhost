@@ -25,8 +25,8 @@ pub fn handle_route(
     }
 
     // if let Some(cgi_path) = &route.cgi {
-        // let root = route.root.as_deref().unwrap_or("./");
-        if let Some(root) = &route.root {
+    // let root = route.root.as_deref().unwrap_or("./");
+    if let Some(root) = &route.root {
         if let Some(default_file) = &route.default_file {
             let file_path = Path::new(root).join(default_file);
             if file_path.exists() {
@@ -77,6 +77,28 @@ pub fn handle_route(
             body: String::new().into(),
         };
     }
+    let path_str = &format!(
+        ".{}/{}",
+        route.root.clone().unwrap_or("".to_string()),
+        route.default_file.clone().unwrap_or("".to_string())
+    );
+    // println!("\npath_str: {}\n", path_str);
+
+    let file_path = Path::new(path_str);
+
+    if file_path.exists() {
+        return HttpResponse::page_server(200,path_str,error_page);
+    }
+
+    // HttpResponse {
+    //     status_code: 200,
+    //     headers: vec![
+    //         ("Content-Type".to_string(), "text/html".to_string()),
+    //         ("Content-Length".to_string(), request.path.len().to_string()),
+    //     ],
+    //     body: request.path.into_bytes(),
+    // }
+    // HttpResponse::
     HttpResponse::not_found(error_page)
 }
 
