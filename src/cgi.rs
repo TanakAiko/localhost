@@ -2,15 +2,44 @@ use crate::cgi_handler::*;
 use crate::config::RouteConfig;
 use crate::http_request::HttpRequest;
 use crate::http_response::HttpResponse;
+use crate::session::SessionManager;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::time::Duration;
+use std::time::SystemTime;
+
+fn handle_session(
+    session_manager: &mut SessionManager,
+    session_id: Option<String>,
+    response: &mut HttpResponse,
+) {
+    if let Some(session) = session_id {
+        // Valider et renouveler la session existante
+        if let Some(sess) = session_manager.get_session_mut(&session) {
+            // sess.expires_at = SystemTime::now() + session_manager.session_duration;
+            sess.expires_at = SystemTime::now() + Duration::from_secs(3600);
+        } else {
+            // Session invalide
+            response.set_cookie("session_id", "", None);
+        }
+    } else {
+        // Créer une nouvelle session
+        let session_id = session_manager.create_session();
+        response.set_cookie("session_id", &session_id, Some(session_manager.get_session(&session_id).unwrap().expires_at));
+    }
+}
 
 pub fn handle_route(
     route: &RouteConfig,
     request: HttpRequest,
     error_page: Option<HashMap<u16, String>>,
 ) -> HttpResponse {
+    // let session_manager = SessionManager::new(Duration::from_secs(3600)); // 1 heure
+    // let session_id = request.get_cookies().get("session_id").cloned();
+
+    
+
     if let Some(listing_enabled) = route.directory_listing {
         if listing_enabled {
             return match list_directory(route.root.as_deref().unwrap_or("./")) {
@@ -87,7 +116,7 @@ pub fn handle_route(
     let file_path = Path::new(path_str);
 
     if file_path.exists() {
-        return HttpResponse::page_server(200,path_str,error_page);
+        return HttpResponse::page_server(200, path_str, error_page);
     }
 
     // HttpResponse {

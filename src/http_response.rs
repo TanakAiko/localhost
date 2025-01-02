@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::{self},
-    path::Path,
+    path::Path, time::SystemTime,
 };
 
 use urlencoding::decode;
@@ -23,6 +23,16 @@ impl HttpResponse {
             body,
         }
     }
+
+        
+        pub fn set_cookie(&mut self, name: &str, value: &str, expires: Option<SystemTime>) {
+            let cookie = match expires {
+                Some(exp) => format!("{}={}; Expires={:?}", name, value, exp),
+                None => format!("{}={}", name, value)
+            };
+            self.headers.push(("Set-Cookie".to_string(), cookie));
+        }
+    
 
     pub fn get_static(request: HttpRequest, error_page: Option<HashMap<u16, String>>) -> Self {
         if let Some((mime_type, content)) = Self::serve_static_file(&request.path) {

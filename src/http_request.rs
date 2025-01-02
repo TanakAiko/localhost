@@ -52,4 +52,18 @@ impl HttpRequest {
             body,
         })
     }
+
+    pub fn get_cookies(&self) -> HashMap<String, String> {
+        let mut cookies = HashMap::new();
+        if let Some(cookie_header) = self.headers.get("Cookie") {
+            // Parse cookie header
+            for cookie in cookie_header.split(';') {
+                if let Some((name, value)) = cookie.split_once('=') {
+                    cookies.insert(name.trim().to_string(), value.trim().to_string());
+                }
+            }
+        }
+        cookies
+    }
+
 }
