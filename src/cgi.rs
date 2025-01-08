@@ -1,3 +1,5 @@
+// route.rs
+
 use crate::cgi_handler::*;
 use crate::config::RouteConfig;
 use crate::http_request::HttpRequest;
@@ -14,13 +16,16 @@ fn handle_session(
     session_id: Option<String>,
     response: &mut HttpResponse,
 ) {
+    println!("Session_ids:\n {:?}", session_manager.sessions);
     if let Some(session) = session_id {
+
         // Valider et renouveler la session existante
         if let Some(sess) = session_manager.get_session_mut(&session) {
+            println!("Session existante: {:?}", sess);
             // sess.expires_at = SystemTime::now() + session_manager.session_duration;
             sess.expires_at = SystemTime::now() + Duration::from_secs(3600);
         } else {
-            // Session invalide
+            // Session_invalide
             response.set_cookie("session_id", "", None);
         }
     } else {
@@ -35,10 +40,8 @@ pub fn handle_route(
     request: HttpRequest,
     error_page: Option<HashMap<u16, String>>,
 ) -> HttpResponse {
-    // let session_manager = SessionManager::new(Duration::from_secs(3600)); // 1 heure
     // let session_id = request.get_cookies().get("session_id").cloned();
-
-    
+    let mut session_manager = SessionManager::new(Duration::from_secs(3600)); // 1 heure
 
     if let Some(listing_enabled) = route.directory_listing {
         if listing_enabled {
@@ -116,7 +119,15 @@ pub fn handle_route(
     let file_path = Path::new(path_str);
 
     if file_path.exists() {
-        return HttpResponse::page_server(200, path_str, error_page);
+        let mut response = HttpResponse::page_server(200, path_str, error_page);
+        let mut session_id = request.get_cookies().get("session_id").cloned();
+        println!("session_id: {:?}", session_id);
+        let id = session_id.clone().unwrap_or(String::new());
+        if id.is_empty() {
+             session_id = None;
+        } 
+        handle_session(&mut session_manager, session_id, &mut response);
+        return response;
     }
 
     // HttpResponse {

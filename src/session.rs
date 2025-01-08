@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::{SystemTime, Duration};
 
+#[derive(Debug)]
 pub struct Session {
     pub id: String,
     pub data: HashMap<String, String>,
