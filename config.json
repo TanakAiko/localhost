@@ -26,10 +26,20 @@
                     "accepted_methods": [
                         "POST",
                         "GET",
-                        "POST", "GET"
+                        "POST"
                     ],
                     "root": "public",
                     "default_file": "import.html",
+                    "directory_listing": false
+                },
+                "/delete": {
+                    "accepted_methods": [
+                        "DELETE",
+                        "GET"
+                    ],
+                    "description": "Route to delete a specific resource",
+                    "root": "public/upload",
+                    "default_file": "",
                     "directory_listing": false
                 },
                 "/cgi-bin": {

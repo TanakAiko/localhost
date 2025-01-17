@@ -151,6 +151,7 @@ impl EventLoop {
 
         let mut buffer = Vec::new(); // Utilisation d'un vecteur dynamique pour accumuler les données
         let mut temp_buffer = [0; 1024];
+        let mut path = "";
 
         // Lire les données initiales (les en-têtes HTTP)
         let bytes_read = stream.read(&mut temp_buffer)?;
@@ -184,9 +185,14 @@ impl EventLoop {
 
             let routes = Self::route_map(&self, fd, hostname.clone());
             let error_pages = Self::get_error_pages(&self, fd, hostname);
-
-            //println!("request.path: '{}'", request.path);
-            let response = match routes.get(&request.path) {
+            // println!("{:?}", routes);
+            if request.path.starts_with("/delete") {
+                path = "/delete";
+            }else {
+                path = &request.path;
+            }
+            println!("request.path: {:?}", routes.get(path));
+            let response = match routes.get(path) {
                 Some(route_config) => HttpResponse::ok(request, route_config, error_pages),
                 None => HttpResponse::get_static(request, error_pages),
             };
@@ -205,7 +211,7 @@ impl EventLoop {
         }
 
         Ok(())
-    }
+    } 
 
     fn route_map(&self, fd: RawFd, hostname: String) -> HashMap<String, RouteConfig> {
         let host = hostname.split_once(":").unwrap_or(("", "")).0;

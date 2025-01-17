@@ -6,3 +6,4 @@ pub mod file_upload;
 pub mod cgi;
 pub mod cgi_handler;
 pub mod session;
+pub mod delete_file;

@@ -6,7 +6,7 @@ use std::{
 
 use urlencoding::decode;
 
-use crate::{cgi::handle_route, config::RouteConfig, file_upload::handle_post, http_request::HttpRequest};
+use crate::{cgi::handle_route, config::RouteConfig, file_upload::handle_post, delete_file::handle_delete, http_request::HttpRequest};
 #[derive(Debug)]
 pub struct HttpResponse {
     pub status_code: u16,
@@ -71,9 +71,15 @@ impl HttpResponse {
             return Self::bad_request(error_page);
         }
 
+        // Check if the path starts with /upload/
+        if request.path.starts_with("/delete") {
+            return handle_delete(request, error_page);
+        }
+
         match request.path.as_str() {
             //"/" => Self::page_server("./public/index.html"),
             "/upload" => Self::handle_post_response(request, error_page),
+            // "/delete" => Self::handle_delete(request, error_page),
             _ => handle_route(route_config, request, error_page)
         }
     }
