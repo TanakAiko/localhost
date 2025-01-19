@@ -5,7 +5,7 @@ use std::{
     os::fd::{AsRawFd, RawFd},
 };
 
-use crate::{config::RouteConfig, http_request::HttpRequest, http_response::HttpResponse};
+use crate::{config::{RouteConfig, ServerConfig}, http_request::HttpRequest, http_response::HttpResponse};
 
 #[derive(Debug)]
 pub struct EventLoop {
@@ -20,6 +20,7 @@ pub struct Server {
     pub listeners: Vec<RawFd>,
     pub route_map: HashMap<String, RouteConfig>,
     pub error_pages: Option<HashMap<u16, String>>,
+    pub size_limit: Option<usize>
 }
 
 impl EventLoop {
@@ -41,6 +42,7 @@ impl EventLoop {
         server_name: String,
         routes: HashMap<String, RouteConfig>,
         error_pages: Option<HashMap<u16, String>>,
+        size_limit: Option<usize>
     ) {
         if self.servers.contains_key(&server_name) {
             eprintln!(
@@ -57,6 +59,7 @@ impl EventLoop {
                 listeners: Vec::new(),
                 route_map: routes,
                 error_pages,
+                size_limit
             },
         );
     }
@@ -68,6 +71,7 @@ impl EventLoop {
         server_name: String,
         routes: HashMap<String, RouteConfig>,
         error_pages: Option<HashMap<u16, String>>,
+        size_limit: Option<usize>
     ) -> std::io::Result<()> {
         let mut event = libc::epoll_event {
             events: (libc::EPOLLIN | libc::EPOLLET) as u32,
@@ -88,6 +92,7 @@ impl EventLoop {
             listeners: Vec::new(),
             route_map: routes,
             error_pages,
+            size_limit
         });
 
         //println!("\nlistener.as_raw_fd(): {}", listener.as_raw_fd());
@@ -184,7 +189,8 @@ impl EventLoop {
                 .unwrap_or_else(|| "".to_string());
 
             let routes = Self::route_map(&self, fd, hostname.clone());
-            let error_pages = Self::get_error_pages(&self, fd, hostname);
+            let error_pages = Self::get_error_pages(&self, fd, hostname.clone());
+            let size_limit = Self::get_size_limit(&self, fd, hostname);
             // println!("{:?}", routes);
             if request.path.starts_with("/delete") {
                 path = "/delete";
@@ -193,7 +199,7 @@ impl EventLoop {
             }
             println!("request.path: {:?}", routes.get(path));
             let response = match routes.get(path) {
-                Some(route_config) => HttpResponse::ok(request, route_config, error_pages),
+                Some(route_config) => HttpResponse::ok(request, route_config, error_pages, size_limit),
                 None => HttpResponse::get_static(request, error_pages),
             };
 
@@ -250,6 +256,25 @@ impl EventLoop {
             .values()
             .find(|server| server.listeners.contains(&fd))
             .and_then(|server| server.error_pages.clone())
+    }
+
+    fn get_size_limit(&self, fd: RawFd, hostname: String) -> Option<usize> {
+        let host = hostname.split_once(":").unwrap_or(("", "")).0;
+
+        // Recherche par nom d'hôte
+        if let Some(server) = self
+            .servers
+            .values()
+            .find(|server| server.name.to_lowercase() == host)
+        {
+            return server.size_limit.clone()
+        }
+
+        // Recherche par descripteur de fichier (fd)
+        self.servers
+            .values()
+            .find(|server| server.listeners.contains(&fd))
+            .and_then(|server| server.size_limit.clone())
     }
 
     // Fonction pour extraire la longueur du contenu des en-têtes HTTP

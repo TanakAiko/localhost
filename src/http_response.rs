@@ -61,6 +61,7 @@ impl HttpResponse {
         request: HttpRequest,
         route_config: &RouteConfig,
         error_page: Option<HashMap<u16, String>>,
+        size_limit: Option<usize>
     ) -> Self {
         let methodes = match route_config.accepted_methods.clone() {
             Some(methode) => methode,
@@ -68,7 +69,7 @@ impl HttpResponse {
         };
 
         if !methodes.contains(&request.method) {
-            return Self::bad_request(error_page);
+            return Self::method_not_allowed(error_page);
         }
 
         // Check if the path starts with /upload/
@@ -78,7 +79,7 @@ impl HttpResponse {
 
         match request.path.as_str() {
             //"/" => Self::page_server("./public/index.html"),
-            "/upload" => Self::handle_post_response(request, error_page),
+            "/upload" => Self::handle_post_response(request, error_page, size_limit),
             // "/delete" => Self::handle_delete(request, error_page),
             _ => handle_route(route_config, request, error_page)
         }
@@ -98,10 +99,10 @@ impl HttpResponse {
     pub fn handle_post_response(
         request: HttpRequest,
         error_page: Option<HashMap<u16, String>>,
+        size_limit: Option<usize>
     ) -> Self {
-        const MAX_BODY_SIZE: usize = 1024 * 1024; //1MB
 
-        if request.body.len() > MAX_BODY_SIZE {
+        if request.body.len() > size_limit.unwrap_or(0) {
             return Self::payload_too_large(error_page);
         };
 
