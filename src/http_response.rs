@@ -1,12 +1,15 @@
 use std::{
     collections::HashMap,
     fs::{self},
-    path::Path, time::SystemTime,
+    path::Path,
+    time::SystemTime,
 };
 
 use urlencoding::decode;
 
-use crate::{cgi::handle_route, config::RouteConfig, file_upload::handle_post, delete_file::handle_delete, http_request::HttpRequest};
+use crate::{
+    cgi::handle_route, config::RouteConfig, file_upload::handle_post, http_request::HttpRequest,
+};
 #[derive(Debug)]
 pub struct HttpResponse {
     pub status_code: u16,
@@ -24,15 +27,13 @@ impl HttpResponse {
         }
     }
 
-        
     pub fn set_cookie(&mut self, name: &str, value: &str, expires: Option<SystemTime>) {
         let cookie = match expires {
             Some(exp) => format!("{}={}; Expires={:?}", name, value, exp),
-            None => format!("{}={}", name, value)
+            None => format!("{}={}", name, value),
         };
         self.headers.push(("Set-Cookie".to_string(), cookie));
     }
-    
 
     pub fn get_static(request: HttpRequest, error_page: Option<HashMap<u16, String>>) -> Self {
         if let Some((mime_type, content)) = Self::serve_static_file(&request.path) {
@@ -53,6 +54,7 @@ impl HttpResponse {
             };
         }
 
+        println!("Not found (get_static)");
         Self::not_found(error_page)
     }
 
@@ -61,7 +63,7 @@ impl HttpResponse {
         request: HttpRequest,
         route_config: &RouteConfig,
         error_page: Option<HashMap<u16, String>>,
-        size_limit: Option<usize>
+        size_limit: Option<usize>,
     ) -> Self {
         let methodes = match route_config.accepted_methods.clone() {
             Some(methode) => methode,
@@ -72,16 +74,9 @@ impl HttpResponse {
             return Self::method_not_allowed(error_page);
         }
 
-        // Check if the path starts with /upload/
-        if request.path.starts_with("/delete") {
-            return handle_delete(request, error_page);
-        }
-
         match request.path.as_str() {
-            //"/" => Self::page_server("./public/index.html"),
             "/upload" => Self::handle_post_response(request, error_page, size_limit),
-            // "/delete" => Self::handle_delete(request, error_page),
-            _ => handle_route(route_config, request, error_page)
+            _ => handle_route(route_config, request, error_page),
         }
     }
 
@@ -92,16 +87,15 @@ impl HttpResponse {
                 headers: vec![("Content-Type".to_string(), "text/html".to_string())],
                 body: body.into(),
             },
-            Err(_) => HttpResponse::internal_server_error(error_page)
+            Err(_) => HttpResponse::internal_server_error(error_page),
         }
     }
     //im handling post here
     pub fn handle_post_response(
         request: HttpRequest,
         error_page: Option<HashMap<u16, String>>,
-        size_limit: Option<usize>
+        size_limit: Option<usize>,
     ) -> Self {
-
         if request.body.len() > size_limit.unwrap_or(0) {
             return Self::payload_too_large(error_page);
         };
@@ -155,12 +149,7 @@ impl HttpResponse {
                 let good_path = &format!(".{}", custom_path);
                 let path = Path::new(good_path);
                 if path.exists() {
-                    println!("Path EXISSSTTTTTTT");
-                    return Self::page_server(
-                        status_code,
-                        &format!(".{}", custom_path),
-                        error_page,
-                    );
+                    return Self::page_server(status_code, &custom_path, error_page);
                 }
             }
         }
@@ -186,13 +175,16 @@ impl HttpResponse {
         }
     }
 
-    pub fn upload_dir(error_page: Option<HashMap<u16, String>>) -> Self {
-        let template = match fs::read_to_string("./public/import.html") {
+    pub fn list_dir(dir: String, error_page: Option<HashMap<u16, String>>) -> Self {
+        let template = match fs::read_to_string("./public/list_dir.html") {
             Ok(temp) => temp,
             Err(_) => return Self::internal_server_error(error_page),
         };
 
-        let content = Self::list_upload_content();
+        let content = Self::list_content(dir);
+        if content == "!existe" {
+            return Self::internal_server_error(error_page);
+        }
 
         let body = template.replace("{{content}}", &content);
 
@@ -206,8 +198,10 @@ impl HttpResponse {
         }
     }
 
-    fn list_upload_content() -> String {
-        let cont = match fs::read_dir("./public/upload") {
+    fn list_content(dir: String) -> String {
+        let path_str = format!("./public{}", dir);
+        println!("dir: {}", dir);
+        let cont = match fs::read_dir(path_str) {
             Ok(entries) => {
                 let mut content = String::new();
                 for entry in entries {
@@ -225,19 +219,23 @@ impl HttpResponse {
 
                     if file_type.is_dir() {
                         content.push_str(&format!(
-                            "<li>[Folder] <a href=\"upload/{0}/\">{0}</a></li>",
+                            "<li>[Folder] <a href=\"{}/{}/\">{}</a></li>",
+                            dir.trim_start_matches("/"),
+                            file_name,
                             file_name
                         ));
                     } else {
                         content.push_str(&format!(
-                            "<li><a href=\"upload/{0}\">{0}</a></li>",
+                            "<li>[File] <a href=\"{}/{}\">{}</a></li>",
+                            dir.trim_start_matches("/"),
+                            file_name,
                             file_name
                         ));
                     }
                 }
                 content
             }
-            Err(_) => "".to_string(),
+            Err(_) => "!existe".to_string(),
         };
         cont
     }
@@ -247,7 +245,10 @@ impl HttpResponse {
         path: &str,
         error_page: Option<HashMap<u16, String>>,
     ) -> Self {
-        let body = match fs::read_to_string(path) {
+        println!("path: {}", path);
+        let real_path = format!("./public/{}", path);
+        println!("real_path: {}", real_path);
+        let body = match fs::read_to_string(real_path) {
             Ok(temp) => temp,
             Err(_) => return Self::internal_server_error(error_page),
         };

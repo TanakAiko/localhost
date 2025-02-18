@@ -12,7 +12,7 @@ use std::{
 
 pub fn handle_post(request: HttpRequest, error_page: Option<HashMap<u16, String>>) -> HttpResponse {
     if request.method == "GET" {
-        return HttpResponse::upload_dir(error_page);
+        return HttpResponse::list_dir(request.path, error_page);
     }
 
     let content_type = request
@@ -62,7 +62,7 @@ pub fn handle_post(request: HttpRequest, error_page: Option<HashMap<u16, String>
                 return HttpResponse::bad_request(error_page);
             };
 
-            return HttpResponse::upload_dir(error_page);
+            return HttpResponse::list_dir(request.path, error_page);
         }
     }
 

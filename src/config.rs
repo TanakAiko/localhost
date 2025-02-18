@@ -27,7 +27,6 @@ pub struct ServerConfig {
 pub struct RouteConfig {
     pub accepted_methods: Option<Vec<String>>, // Ex: ["GET", "POST"]
     pub redirection: Option<String>,           // Ex: "/old" -> "/new"
-    pub root: Option<String>,                  // Ex: "/test" -> "/usr/Desktop"
     pub default_file: Option<String>,          // Ex: "index.html"
     pub cgi: Option<String>,                   // Ex: Extension ".py" -> "/path/to/python"
     pub directory_listing: Option<bool>,

@@ -9,8 +9,8 @@
                 "8081"
             ],
             "error_pages": {
-                "404": "/public/errors/404.html",
-                "500": "/public/errors/500.html"
+                "404": "errors/404.html",
+                "500": "errors/500.html"
             },
             "routes": {
                 "/": {
@@ -18,9 +18,15 @@
                         "GET",
                         "POST"
                     ],
-                    "root": "/public",
-                    "default_file": "index.html",
-                    "directory_listing": false
+                    "default_file": "index.html"
+                },
+                "/errors": {
+                    "accepted_methods": [
+                        "GET",
+                        "POST"
+                    ],
+                    "default_file": "index2.html",
+                    "directory_listing": true
                 },
                 "/upload": {
                     "accepted_methods": [
@@ -28,53 +34,34 @@
                         "GET",
                         "POST"
                     ],
-                    "root": "public",
-                    "default_file": "import.html",
-                    "directory_listing": false
-                },
-                "/delete": {
-                    "accepted_methods": [
-                        "DELETE",
-                        "GET"
-                    ],
-                    "description": "Route to delete a specific resource",
-                    "root": "public/upload",
-                    "default_file": "",
-                    "directory_listing": false
+                    "default_file": "import.html"
                 },
                 "/cgi-bin": {
                     "accepted_methods": [
                         "GET",
                         "POST"
                     ],
-                    "root": "cgi-bin",
-                    "default_file": "script.py",
-                    "cgi": "/usr/bin/python3",
-                    "directory_listing": false
+                    "default_file": "cgi-bin/script.py",
+                    "cgi": "cgi-bin/usr/bin/python3"
                 },
                 "/cgi-bin/script.py": {
                     "accepted_methods": [
                         "GET",
                         "POST"
                     ],
-                    "root": "cgi-bin",
-                    "cgi": "/usr/bin/python3",
-                    "directory_listing": false
+                    "cgi": "cgi-bin/usr/bin/python3"
                 },
                 "/redirect": {
                     "accepted_methods": [
                         "GET",
                         "POST"
                     ],
-                    "redirection": "/new-location",
-                    "directory_listing": false
+                    "redirection": "/"
                 },
                 "/static": {
                     "accepted_methods": [
-                        "GET",
-                        "POST"
+                        "GET"
                     ],
-                    "root": "cgi-bin",
                     "directory_listing": true
                 }
             }
@@ -95,23 +82,18 @@
                     "accepted_methods": [
                         "GET"
                     ],
-                    
-                    "default_file": "home.html",
-                    "directory_listing": false
+                    "default_file": "home.html"
                 },
                 "/uploads": {
                     "accepted_methods": [
                         "POST"
-                    ],
-                    "root": "/var/www/uploads",
-                    "directory_listing": false
+                    ]
                 },
                 "/cgi-bin/process.php": {
                     "accepted_methods": [
                         "POST"
                     ],
-                    "cgi": "/usr/bin/php",
-                    "directory_listing": false
+                    "cgi": "/usr/bin/php"
                 }
             }
         }

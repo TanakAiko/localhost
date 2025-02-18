@@ -5,7 +5,7 @@ use std::{
     os::fd::{AsRawFd, RawFd},
 };
 
-use crate::{config::{RouteConfig, ServerConfig}, http_request::HttpRequest, http_response::HttpResponse};
+use crate::{config::RouteConfig, http_request::HttpRequest, http_response::HttpResponse};
 
 #[derive(Debug)]
 pub struct EventLoop {
@@ -156,7 +156,6 @@ impl EventLoop {
 
         let mut buffer = Vec::new(); // Utilisation d'un vecteur dynamique pour accumuler les données
         let mut temp_buffer = [0; 1024];
-        let mut path = "";
 
         // Lire les données initiales (les en-têtes HTTP)
         let bytes_read = stream.read(&mut temp_buffer)?;
@@ -192,13 +191,9 @@ impl EventLoop {
             let error_pages = Self::get_error_pages(&self, fd, hostname.clone());
             let size_limit = Self::get_size_limit(&self, fd, hostname);
             // println!("{:?}", routes);
-            if request.path.starts_with("/delete") {
-                path = "/delete";
-            }else {
-                path = &request.path;
-            }
-            println!("request.path: {:?}", routes.get(path));
-            let response = match routes.get(path) {
+            
+            println!("request.path: {:?}", routes.get(&request.path));
+            let response = match routes.get(&request.path) {
                 Some(route_config) => HttpResponse::ok(request, route_config, error_pages, size_limit),
                 None => HttpResponse::get_static(request, error_pages),
             };
