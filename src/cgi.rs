@@ -27,6 +27,7 @@ fn handle_session(
             response.set_cookie("session_id", "", None);
         }
     } else {
+        
         // Créer une nouvelle session
         let session_id = session_manager.create_session();
         response.set_cookie(
@@ -42,7 +43,12 @@ pub fn handle_route(
     request: HttpRequest,
     error_page: Option<HashMap<u16, String>>,
 ) -> HttpResponse {
-    let mut session_manager = SessionManager::new(Duration::from_secs(3600)); // 1 heure
+    // let session_id = request.get_cookies().get("session_id").cloned();
+    // let mut session_manager = SessionManager::new(Duration::from_secs(3600)); // 1 heure
+
+    let mut session_manager = SessionManager::global()
+        .lock()
+        .expect("Failed to lock session manager");
 
     if let Some(listing_enabled) = route.directory_listing {
         if listing_enabled {

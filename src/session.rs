@@ -1,5 +1,8 @@
 use std::collections::HashMap;
+use std::sync::Mutex;
 use std::time::{SystemTime, Duration};
+
+use lazy_static::lazy_static;
 
 #[derive(Debug)]
 pub struct Session {
@@ -14,7 +17,16 @@ pub struct SessionManager {
     pub session_duration: Duration,
 }
 
+lazy_static! {
+    static ref GLOBAL_SESSION_MANAGER: Mutex<SessionManager> = Mutex::new(SessionManager::new(Duration::from_secs(60 * 60)));
+}
+
 impl SessionManager {
+
+    pub fn global() -> &'static Mutex<SessionManager> {
+        &GLOBAL_SESSION_MANAGER
+    }
+
     pub fn new(session_duration: Duration) -> Self {
         Self {
             sessions: HashMap::new(),
