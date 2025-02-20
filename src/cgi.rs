@@ -88,22 +88,3 @@ pub fn handle_route(
     println!("Not found (handle_route)");
     HttpResponse::not_found(error_page)
 }
-
-// fn list_directory(dir: &str) -> Result<String, String> {
-//     match fs::read_dir(dir) {
-//         Ok(entries) => {
-//             let mut html = String::from("<html><body><ul>");
-
-//             for entry in entries {
-//                 if let Ok(entry) = entry {
-//                     let name = entry.file_name().to_string_lossy().to_string();
-//                     html.push_str(&format!("<li>{}</li>", name));
-//                 }
-//             }
-
-//             html.push_str("</ul></body></html>");
-//             Ok(html)
-//         }
-//         Err(e) => Err(e.to_string()),
-//     }
-// }
