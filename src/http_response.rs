@@ -8,7 +8,7 @@ use std::{
 use urlencoding::decode;
 
 use crate::{
-    cgi::handle_route, config::RouteConfig, file_upload::handle_post, http_request::HttpRequest,
+    cgi::handle_route, config::RouteConfig, delete_file::handle_delete, file_upload::handle_post, http_request::HttpRequest
 };
 #[derive(Debug)]
 pub struct HttpResponse {
@@ -76,6 +76,7 @@ impl HttpResponse {
 
         match request.path.as_str() {
             "/upload" => Self::handle_post_response(request, error_page, size_limit),
+            "/delete" => handle_delete(request, error_page),
             _ => handle_route(route_config, request, error_page),
         }
     }
@@ -186,7 +187,33 @@ impl HttpResponse {
             return Self::internal_server_error(error_page);
         }
 
-        let body = template.replace("{{content}}", &content);
+        let script = r#"
+            <script>
+            function deleteFile(filePath) {
+                if (confirm("Êtes-vous sûr de vouloir supprimer ce fichier?")) {
+                    fetch('/delete', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ path: filePath })
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            // Recharge la page en cas de succès
+                            window.location.reload();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erreur:', error);
+                        alert("Une erreur s'est produite lors de la suppression");
+                    });
+                }
+            }
+            </script>
+            "#;
+
+        let body = template.replace("{{content}}", &content) + script;
 
         Self {
             status_code: 200,
@@ -217,19 +244,33 @@ impl HttpResponse {
                         Err(_) => return "".to_string(),
                     };
 
+                    let mut buton = String::new();
+                    if dir == "/upload" {
+                        buton = format!(
+                            "<button type=\"button\" onclick=\"deleteFile('{}')\">Delete</button>",
+                            file_name
+                        );
+                    }
+
                     if file_type.is_dir() {
                         content.push_str(&format!(
-                            "<li>[Folder] <a href=\"{}/{}/\">{}</a></li>",
+                            "<div>
+                                <li>[Folder] <a href=\"{}/{}\">{}</a>{}</li>
+                            </div>",
                             dir.trim_start_matches("/"),
                             file_name,
-                            file_name
+                            file_name,
+                            buton
                         ));
                     } else {
                         content.push_str(&format!(
-                            "<li>[File] <a href=\"{}/{}\">{}</a></li>",
+                            "<div>
+                                <li>[File] <a href=\"{}/{}\">{}</a>{}</li> 
+                            </div>",
                             dir.trim_start_matches("/"),
                             file_name,
-                            file_name
+                            file_name,
+                            buton
                         ));
                     }
                 }
@@ -307,6 +348,7 @@ impl HttpResponse {
 
         let file_path = format!("public{}", decoded_path);
         println!("file_path: '{}'", file_path);
+        
         if Path::new(&file_path).exists() {
             let content = fs::read(&file_path).ok()?;
             let mime_type = if path.ends_with(".css") {

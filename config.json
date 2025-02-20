@@ -25,8 +25,7 @@
                         "GET",
                         "POST"
                     ],
-                    "default_file": "index2.html",
-                    "directory_listing": true
+                    "default_file": "index2.html"
                 },
                 "/upload": {
                     "accepted_methods": [
@@ -63,6 +62,11 @@
                         "GET"
                     ],
                     "directory_listing": true
+                },
+                "/delete": {
+                    "accepted_methods": [
+                        "DELETE"
+                    ]
                 }
             }
         },

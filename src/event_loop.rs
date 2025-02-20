@@ -192,7 +192,6 @@ impl EventLoop {
             let size_limit = Self::get_size_limit(&self, fd, hostname);
             // println!("{:?}", routes);
             
-            println!("request.path: {:?}", routes.get(&request.path));
             let response = match routes.get(&request.path) {
                 Some(route_config) => HttpResponse::ok(request, route_config, error_pages, size_limit),
                 None => HttpResponse::get_static(request, error_pages),
