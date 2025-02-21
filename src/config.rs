@@ -65,11 +65,33 @@ impl Config {
         // let mut addesses = Vec::new();
 
         for server in &self.servers {
+
+
             // Check if there's two server with the same name
             if !server_names.insert(&server.name) {
                 eprintln!("IGNORE: Duplicate server name '{}'", server.name);
                 continue;
             }
+
+            // Créer une copie mutable des routes du serveur
+            let mut server_routes = server.routes.clone();
+
+            // Ajouter les routes de session
+            server_routes.insert("/session".to_string(), RouteConfig {
+                accepted_methods: Some(vec!["GET".to_string()]),
+                default_file: Some("session.html".to_string()),
+                redirection: None,
+                cgi: None,
+                directory_listing: None,
+            });
+
+            server_routes.insert("/create-session".to_string(), RouteConfig {
+                accepted_methods: Some(vec!["POST".to_string()]),
+                default_file: Some("session.html".to_string()),
+                redirection: None,
+                cgi: None,
+                directory_listing: None,
+            });
 
             for port in &server.ports {
                 let address = format!("{}:{}", server.addr, port);
@@ -119,8 +141,8 @@ impl Config {
 
                 Self::add_to_hosts(&server.name, &server.addr)?;
                 println!("Server '{}' launched at: http://{}", server.name, address);
-                let routes = server.routes.clone();
-                event_loop.add_listener(&listener, server.name.clone(), routes, server.error_pages.clone(), server.client_body_size_limit)?;
+                // let routes = server.routes.clone();
+                event_loop.add_listener(&listener, server.name.clone(), server_routes.clone(), server.error_pages.clone(), server.client_body_size_limit)?;
                 listener_list.push(listener);
             }
         }

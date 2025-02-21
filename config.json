@@ -67,18 +67,6 @@
                     "accepted_methods": [
                         "DELETE"
                     ]
-                },
-                "/create-session": {
-                    "accepted_methods": [
-                        "POST"
-                    ],
-                    "default_file": "session.html"
-                },
-                "/session": {
-                    "accepted_methods": [
-                        "GET"
-                    ],
-                    "default_file": "session.html"
                 }
             }
         },

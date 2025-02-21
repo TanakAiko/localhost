@@ -10,34 +10,6 @@ use std::path::Path;
 use std::time::Duration;
 use std::time::SystemTime;
 
-/* fn handle_session(
-    session_manager: &mut SessionManager,
-    session_id: Option<String>,
-    response: &mut HttpResponse,
-) {
-    println!("Session_ids:\n {:?}", session_manager.sessions);
-    if let Some(session) = session_id {
-        // Valider et renouveler la session existante
-        if let Some(sess) = session_manager.get_session_mut(&session) {
-            println!("Session existante: {:?}", sess);
-            // sess.expires_at = SystemTime::now() + session_manager.session_duration;
-            sess.expires_at = SystemTime::now() + Duration::from_secs(3600);
-        } else {
-            // Session_invalide
-            response.set_cookie("session_id", "", None);
-        }
-    } else {
-
-        // Créer une nouvelle session
-        let session_id = session_manager.create_session();
-        response.set_cookie(
-            "session_id",
-            &session_id,
-            Some(session_manager.get_session(&session_id).unwrap().expires_at),
-        );
-    }
-} */
-
 fn handle_session(
     session_manager: &mut SessionManager,
     session_id: Option<String>,
@@ -86,15 +58,45 @@ pub fn handle_route(
     request: HttpRequest,
     error_page: Option<HashMap<u16, String>>,
 ) -> HttpResponse {
-    // let session_id = request.get_cookies().get("session_id").cloned();
-    // let mut session_manager = SessionManager::new(Duration::from_secs(3600)); // 1 heure
+    println!("///////////////////////////////////////////////////session_route");
 
     let mut session_manager = SessionManager::global()
         .lock()
         .expect("Failed to lock session manager");
 
+    // Obtenir les routes de session
+    let session_routes = SessionManager::get_default_routes();
+
+    // Vérifier si c'est une route de session
+    if let Some(session_route) = session_routes.get(&request.path) {
+        if request.path == "/create-session" && request.method == "POST" {
+            let session_id = session_manager.create_session();
+            return HttpResponse {
+                status_code: 302,
+                headers: vec![
+                    ("Location".to_string(), "/".to_string()),
+                    (
+                        "Set-Cookie".to_string(),
+                        format!("session_id={}; Path=/", session_id),
+                    ),
+                ],
+                body: Vec::new(),
+            };
+        } else {
+            // Pour /session
+            return HttpResponse::page_server(
+                200,
+                session_route
+                    .default_file
+                    .as_deref()
+                    .unwrap_or("session.html"),
+                error_page,
+            );
+        }
+    }
+
     // Gestion spéciale pour la création de session
-    if request.path == "/create-session" && request.method == "POST" {
+    /* if request.path == "/create-session" && request.method == "POST" {
         let session_id = session_manager.create_session();
         return HttpResponse {
             status_code: 302,
@@ -107,7 +109,7 @@ pub fn handle_route(
             ],
             body: Vec::new(),
         };
-    }
+    } */
 
     // Vérification de la session pour toutes les autres routes
     let session_id = request.get_cookies().get("session_id").cloned();
@@ -120,7 +122,7 @@ pub fn handle_route(
                     return response;
                 }
             }
-        
+
             if let Some(redirect_to) = &route.redirection {
                 return HttpResponse {
                     status_code: 301,
@@ -128,7 +130,7 @@ pub fn handle_route(
                     body: String::new().into(),
                 };
             }
-        
+
             if let Some(default_file) = &route.default_file {
                 let path_str = format!("./public/{}", default_file);
                 let file_path = Path::new(&path_str);
@@ -140,7 +142,7 @@ pub fn handle_route(
                             Err(_) => HttpResponse::internal_server_error(error_page),
                         };
                     }
-        
+
                     let response = HttpResponse::page_server(200, &default_file, error_page);
                     // let mut session_id = request.get_cookies().get("session_id").cloned();
                     // let id = session_id.clone().unwrap_or(String::new());
@@ -153,13 +155,11 @@ pub fn handle_route(
                     println!("file_path.exists() === false")
                 }
             };
-        
+
             println!("Not found (handle_route)");
             HttpResponse::not_found(error_page)
             // ... reste du code ...
         }
         Err(redirect_response) => redirect_response,
     }
-
-   
 }

@@ -4,6 +4,8 @@ use std::time::{SystemTime, Duration};
 
 use lazy_static::lazy_static;
 
+use crate::config::RouteConfig;
+
 #[derive(Debug)]
 pub struct Session {
     pub id: String,
@@ -56,5 +58,29 @@ impl SessionManager {
 
     pub fn remove_session(&mut self, id: &str) {
         self.sessions.remove(id);
+    }
+
+    pub fn get_default_routes() -> HashMap<String, RouteConfig> {
+        let mut routes: HashMap<String, RouteConfig> = HashMap::new();
+        
+        // Route pour la page de création de session
+        routes.insert("/session".to_string(), RouteConfig {
+            accepted_methods: Some(vec!["GET".to_string()]),
+            default_file: Some("session.html".to_string()),
+            redirection: None,
+            cgi: None,
+            directory_listing: None,
+        });
+
+        // Route pour l'action de création de session
+        routes.insert("/create-session".to_string(), RouteConfig {
+            accepted_methods: Some(vec!["POST".to_string()]),
+            default_file: None,
+            redirection: None,
+            cgi: None,
+            directory_listing: None,
+        });
+
+        routes
     }
 }
