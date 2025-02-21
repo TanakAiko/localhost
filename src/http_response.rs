@@ -8,7 +8,8 @@ use std::{
 use urlencoding::decode;
 
 use crate::{
-    cgi::handle_route, config::RouteConfig, delete_file::handle_delete, file_upload::handle_post, http_request::HttpRequest
+    cgi::handle_route, config::RouteConfig, delete_file::handle_delete, file_upload::handle_post,
+    http_request::HttpRequest,
 };
 #[derive(Debug)]
 pub struct HttpResponse {
@@ -348,7 +349,7 @@ impl HttpResponse {
 
         let file_path = format!("public{}", decoded_path);
         println!("file_path: '{}'", file_path);
-        
+
         if Path::new(&file_path).exists() {
             let content = fs::read(&file_path).ok()?;
             let mime_type = if path.ends_with(".css") {

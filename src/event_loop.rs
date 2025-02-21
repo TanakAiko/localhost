@@ -156,6 +156,7 @@ impl EventLoop {
 
         let mut buffer = Vec::new(); // Utilisation d'un vecteur dynamique pour accumuler les données
         let mut temp_buffer = [0; 1024];
+        let mut _path = "";
 
         // Lire les données initiales (les en-têtes HTTP)
         let bytes_read = stream.read(&mut temp_buffer)?;
