@@ -248,16 +248,22 @@ impl HttpResponse {
                     let mut buton = String::new();
                     if dir == "/upload" {
                         buton = format!(
-                            "<button type=\"button\" onclick=\"deleteFile('{}')\">Delete</button>",
+                            "<button type=\"button\" class=\"delete-btn\" onclick=\"deleteFile('{}')\">
+                             <i class=\"fas fa-trash-alt\"></i> Delete
+                             </button>",
                             file_name
                         );
                     }
 
                     if file_type.is_dir() {
                         content.push_str(&format!(
-                            "<div>
-                                <li>[Folder] <a href=\"{}/{}\">{}</a>{}</li>
-                            </div>",
+                            "<div class=\"file-info\">
+                            <div class=\"file-icon image-file\">
+							<i class=\"fas fa-image\"></i>
+						    </div>
+                                <span[Folder]  class=\"file-name\" > <a class=\"file-link\" href=\"{}/{}\">{}</a>{}</span>
+                            </div>
+                            ",
                             dir.trim_start_matches("/"),
                             file_name,
                             file_name,
@@ -265,14 +271,36 @@ impl HttpResponse {
                         ));
                     } else {
                         content.push_str(&format!(
-                            "<div>
-                                <li>[File] <a href=\"{}/{}\">{}</a>{}</li> 
-                            </div>",
+                            "<li class=\"file-item\">
+                                <div class=\"file-info\">
+                                    <div class=\"file-icon image-file\">
+                                        <i class=\"fas fa-image\"></i>
+                                    </div>
+                                    <span class=\"file-name\"> <a class=\"file-link\" href=\"{}/{}\">{}</a> </span>
+                                </div>
+                                <div class=\"file-actions\">
+                                    {}
+                                </div>
+                            </li>",
                             dir.trim_start_matches("/"),
                             file_name,
                             file_name,
                             buton
                         ));
+                        // content.push_str(&format!(
+                        //     "
+                        //     <div class=\"file-info\">
+                        //     <div class=\"file-icon image-file\">
+                        // 	<i class=\"fas fa-image\"></i>
+                        //     </div>
+                        //         <span [File] class=\"file-name\"> <a href=\"{}/{}\">{}</a>{}</span>
+                        //      </div>
+                        //     ",
+                        //     dir.trim_start_matches("/"),
+                        //     file_name,
+                        //     file_name,
+                        //     buton
+                        // ));
                     }
                 }
                 content

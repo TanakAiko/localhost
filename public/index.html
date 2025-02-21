@@ -8,7 +8,146 @@
 	<link rel="icon" href="/favicon.ico" type="image/x-icon">
 	<title>Home</title>
 </head>
+<style>
+	* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
 
+body {
+  font-family: 'Noto Sans JP', 'Helvetica Neue', sans-serif;
+  background-color: #f7f7f7;
+  background-image: linear-gradient(to bottom right, #f3f4f6, #e5e7eb);
+  color: #333;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#main {
+  width: 100%;
+  max-width: 500px;
+  padding: 20px;
+}
+
+.fof {
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  padding: 40px 30px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.fof::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: linear-gradient(to right, #e66465, #9198e5);
+}
+
+h1 {
+  font-size: 2.5rem;
+  margin-bottom: 30px;
+  color: #333;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+label {
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: -10px;
+}
+
+input[type="file"] {
+  width: 100%;
+  max-width: 300px;
+  padding: 10px;
+  border: 2px dashed #ddd;
+  border-radius: 8px;
+  background-color: #fafafa;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+input[type="file"]:hover {
+  border-color: #9198e5;
+  background-color: #f0f2ff;
+}
+
+input[type="file"]:focus {
+  outline: none;
+  border-color: #6470e8;
+}
+
+button {
+  background-color: #6470e8;
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 6px rgba(100, 112, 232, 0.2);
+}
+
+button:hover {
+  background-color: #5562d8;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(100, 112, 232, 0.3);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+/* Modern file input styling with custom preview */
+input[type="file"]::file-selector-button {
+  border: 0;
+  padding: 8px 16px;
+  border-radius: 4px;
+  background-color: #e1e4ff;
+  color: #5562d8;
+  margin-right: 16px;
+  transition: all 0.2s;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background-color: #d1d6ff;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .fof {
+    padding: 30px 20px;
+  }
+  
+  h1 {
+    font-size: 2rem;
+  }
+  
+  input[type="file"] {
+    width: 100%;
+  }
+}
+</style>
 <body>
 	<div id="main">
 		<div class="fof">

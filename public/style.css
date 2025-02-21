@@ -12,6 +12,7 @@ body {
     margin: 0;
 }
 
+
 #main {
     display: table;
     width: 100%;
@@ -49,3 +50,4 @@ a {
         box-shadow: inset -3px 0px 0px transparent;
     }
 }
+

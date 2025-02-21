@@ -8,14 +8,166 @@
 	<link rel="icon" href="/favicon.ico" type="image/x-icon">
 	<title>Error {{status_code}}</title>
 </head>
+<style>
+	/* Base styles */
+	* {
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+		transition: all 0.3s ease;
+	}
+
+	body {
+		font-family: 'Noto Sans JP', 'Roboto', sans-serif;
+		background-color: #f7f7f7;
+		background-image: linear-gradient(to bottom right, #f3f4f6, #e5e7eb);
+		color: #333;
+		min-height: 100vh;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	#main {
+		width: 100%;
+		max-width: 500px;
+		padding: 20px;
+	}
+
+	.fof {
+		background-color: white;
+		border-radius: 12px;
+		box-shadow: 0 10px 25px rgba(0, 0, 0, 0.07);
+		padding: 40px;
+		text-align: center;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.fof::before {
+		content: "";
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 4px;
+		background: linear-gradient(to right, #ff4d6d, #ff8080);
+	}
+
+	.fof h1 {
+		font-size: 36px;
+		color: #ff4d6d;
+		margin-bottom: 20px;
+		font-weight: 500;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-direction: column;
+	}
+
+	.fof h1::after {
+		content: ":(";
+		font-size: 24px;
+		margin-top: 5px;
+		opacity: 0.7;
+	}
+
+	.fof p {
+		font-size: 18px;
+		color: #666;
+		line-height: 1.6;
+	}
+
+	/* Add a back button */
+	.back-btn {
+		display: inline-block;
+		margin-top: 30px;
+		background-color: transparent;
+		border: 1px solid #6470e8;
+		color: #6470e8;
+		padding: 10px 20px;
+		border-radius: 6px;
+		font-size: 16px;
+		font-weight: 500;
+		text-decoration: none;
+		transition: all 0.3s;
+	}
+
+	.back-btn:hover {
+		background-color: #6470e8;
+		color: white;
+		transform: translateY(-2px);
+		box-shadow: 0 4px 8px rgba(100, 112, 232, 0.2);
+	}
+
+
+
+	/* Animation for the error number */
+	@keyframes shake {
+
+		0%,
+		100% {
+			transform: translateX(0);
+		}
+
+		10%,
+		30%,
+		50%,
+		70%,
+		90% {
+			transform: translateX(-5px);
+		}
+
+		20%,
+		40%,
+		60%,
+		80% {
+			transform: translateX(5px);
+		}
+	}
+
+	.fof h1 {
+		animation: shake 0.8s cubic-bezier(.36, .07, .19, .97) both;
+		animation-delay: 0.2s;
+	}
+
+	/* Responsive adjustments */
+	@media (max-width: 600px) {
+		.fof {
+			padding: 30px 20px;
+		}
+
+		.fof h1 {
+			font-size: 28px;
+		}
+
+		.fof p {
+			font-size: 16px;
+		}
+	}
+</style>
 
 <body>
 	<div id="main">
 		<div class="fof">
 			<h1>Error {{status_code}}</h1>
 			<p>{{message}}</p>
+			<a id="homeLink" class="back-btn" href="#"> Go Back Home </a>
 		</div>
 	</div>
 </body>
+
+<script>
+	// For most modern browsers:
+	var domain = window.location.origin;
+
+	// Fallback for older browsers that don't support window.location.origin:
+	if (!domain) {
+		domain = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port : '');
+	}
+
+	// Set the "Go Back Home" link to the domain
+	document.getElementById('homeLink').href = domain;
+</script>
 
 </html>

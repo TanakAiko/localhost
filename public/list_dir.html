@@ -6,14 +6,234 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link rel="stylesheet" href="/style.css">
 	<link rel="icon" href="/favicon.ico" type="image/x-icon">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+	<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
 	<title>Upload</title>
 </head>
+<style>
+	/* Base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
 
+body {
+  font-family: 'Noto Sans JP', 'Roboto', sans-serif;
+  background-color: #f7f7f7;
+  background-image: linear-gradient(to bottom right, #f3f4f6, #e5e7eb);
+  color: #333;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#main {
+  width: 100%;
+  max-width: 900px;
+  padding: 20px;
+}
+
+.fof {
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.07);
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.fof::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(to right, #6470e8, #9198e5);
+}
+
+.fof h1 {
+  font-size: 32px;
+  color: #444;
+  margin-bottom: 30px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fof h1 i {
+  margin-right: 12px;
+  color: #6470e8;
+}
+
+.fof p {
+  font-size: 18px;
+  color: #666;
+}
+
+/* File list styling */
+.file-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px auto;
+  width: 100%;
+}
+
+.file-item {
+  background-color: #f8f9fa;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.3s;
+  text-align: left;
+}
+
+.file-item:hover {
+  background-color: #f0f4ff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(100, 112, 232, 0.1);
+  border-color: #e1e4ff;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.file-icon {
+  font-size: 18px;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  margin-right: 15px;
+  color: white;
+  background-color: #6470e8;
+}
+
+.file-name {
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+.file-link {
+  color: #5562d8;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.file-link:hover {
+  color: #3a46b1;
+  text-decoration: underline;
+}
+
+.file-actions {
+  display: flex;
+  align-items: center;
+}
+
+.delete-btn {
+  background-color: transparent;
+  color: #ff4d6d;
+  border: 1px solid #ff4d6d;
+  padding: 8px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  transition: all 0.3s;
+}
+
+.delete-btn i {
+  margin-right: 5px;
+}
+
+.delete-btn:hover {
+  background-color: #ff4d6d;
+  color: white;
+  box-shadow: 0 4px 8px rgba(255, 77, 109, 0.2);
+}
+
+/* File type specific colors */
+.image-file {
+  background-color: #4facfe;
+  background-image: linear-gradient(to bottom right, #4facfe, #00f2fe);
+}
+
+.model-file {
+  background-color: #6a4c93;
+  background-image: linear-gradient(to bottom right, #8a6bbd, #6a4c93);
+}
+
+.gif-file {
+  background-color: #ff8500;
+  background-image: linear-gradient(to bottom right, #ffaa33, #ff8500);
+}
+
+.document-file {
+  background-color: #1982c4;
+  background-image: linear-gradient(to bottom right, #3b9ae1, #1982c4);
+}
+
+.empty-state {
+  display: none;
+  text-align: center;
+  padding: 40px 0;
+  color: #888;
+}
+
+.empty-state i {
+  font-size: 50px;
+  margin-bottom: 20px;
+  color: #ddd;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .fof {
+    padding: 30px 20px;
+  }
+  
+  .file-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .file-actions {
+    margin-top: 15px;
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .file-name {
+    max-width: 200px;
+  }
+}
+</style>
 <body>
 	<div id="main">
 		<div class="fof">
-			<h1>Content</h1>
-			<ul>
+			<h1><i class="fas fa-folder-open"></i> File Manager</h1>
+			<ul class="file-list">
 				{{content}}
 			</ul>
 		</div>
