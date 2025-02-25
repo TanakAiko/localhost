@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, os::fd::RawFd};
 
 #[derive(Debug)]
 pub struct HttpRequest {
@@ -7,11 +7,30 @@ pub struct HttpRequest {
     pub version: String,
     pub headers: HashMap<String, String>,
     pub body: Vec<u8>,
+    pub fd: RawFd, // Ajout de la propriété fd pour le stateful
 }
 
 impl HttpRequest {
+    pub fn is_http_1_1(&self) -> bool {
+        self.version == "HTTP/1.1"
+    }
+
+    pub fn wants_keep_alive(&self) -> bool {
+        if self.is_http_1_1() {
+            // En HTTP/1.1, la connexion est keep-alive par défaut
+            self.headers
+                .get("Connection")
+                .map_or(true, |v| v.to_lowercase() != "close")
+        } else {
+            // En HTTP/1.0, la connexion est close par défaut
+            self.headers
+                .get("Connection")
+                .map_or(false, |v| v.to_lowercase() == "keep-alive")
+        }
+    }
+
     /// Parse une requête HTTP brute à partir d'octets.
-    pub fn from_raw(raw_request: &[u8]) -> Option<Self> {
+    pub fn from_raw(raw_request: &[u8], fd: RawFd) -> Option<Self> {
         // Trouver la fin des en-têtes (séparé par "\r\n\r\n")
         let headers_end = raw_request
             .windows(4)
@@ -50,6 +69,7 @@ impl HttpRequest {
             version,
             headers,
             body,
+            fd,
         })
     }
 
@@ -65,5 +85,4 @@ impl HttpRequest {
         }
         cookies
     }
-
 }

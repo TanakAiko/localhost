@@ -86,7 +86,7 @@
                     "accepted_methods": [
                         "GET"
                     ],
-                    "default_file": "index2.html"
+                    "default_file": "index.html"
                 },
                 "/abdou": {
                     "accepted_methods": [

@@ -10,7 +10,7 @@ use urlencoding::decode;
 
 use crate::{
     cgi::handle_route, config::RouteConfig, delete_file::handle_delete, file_upload::handle_post,
-    http_request::HttpRequest,
+    http_request::HttpRequest, session::Session,
 };
 #[derive(Debug)]
 pub struct HttpResponse {
@@ -27,6 +27,25 @@ impl HttpResponse {
             headers,
             body,
         }
+    }
+
+    pub fn with_keep_alive(mut self, keep_alive: bool) -> Self {
+        let connection_value = if keep_alive { "keep-alive" } else { "close" };
+        self.headers
+            .push(("Connection".to_string(), connection_value.to_string()));
+
+        if keep_alive {
+            self.headers
+                .push(("Keep-Alive".to_string(), "timeout=5, max=100".to_string()));
+        }
+
+        self
+    }
+
+    pub fn with_session(mut self, session: &Session) -> Self {
+        // Ajouter ou mettre à jour le cookie de session
+        self.set_cookie("session_id", &session.id, Some(session.expires_at));
+        self
     }
 
     pub fn set_cookie(&mut self, name: &str, value: &str, expires: Option<SystemTime>) {
@@ -67,6 +86,7 @@ impl HttpResponse {
         error_page: Option<HashMap<u16, String>>,
         size_limit: Option<usize>,
     ) -> Self {
+        println!("request.path: {}", request.path);
         let methodes = match route_config.accepted_methods.clone() {
             Some(methode) => methode,
             None => {
