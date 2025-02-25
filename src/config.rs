@@ -66,7 +66,6 @@ impl Config {
 
         for server in &self.servers {
 
-
             // Check if there's two server with the same name
             if !server_names.insert(&server.name) {
                 eprintln!("IGNORE: Duplicate server name '{}'", server.name);

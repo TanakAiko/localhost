@@ -1,9 +1,9 @@
 {
     "servers": [
         {
-            "name": "Server1",
+            "name": "server1",
             "client_body_size_limit": 1048576,
-            "addr": "127.0.0.1",
+            "addr": "172.29.168.139",
             "ports": [
                 "8080",
                 "8081"
@@ -41,14 +41,14 @@
                         "POST"
                     ],
                     "default_file": "cgi-bin/script.py",
-                    "cgi": "cgi-bin/usr/bin/python3"
+                    "cgi": "/usr/bin/python3"
                 },
-                "/cgi-bin/script.py": {
+                "cgi-bin/script.py": {
                     "accepted_methods": [
                         "GET",
                         "POST"
                     ],
-                    "cgi": "cgi-bin/usr/bin/python3"
+                    "cgi": "/usr/bin/python3"
                 },
                 "/redirect": {
                     "accepted_methods": [
@@ -71,9 +71,9 @@
             }
         },
         {
-            "name": "Server2",
+            "name": "server2",
             "client_body_size_limit": 5242880,
-            "addr": "127.0.0.1",
+            "addr": "172.29.168.139",
             "ports": [
                 "8082",
                 "8080"
@@ -86,12 +86,14 @@
                     "accepted_methods": [
                         "GET"
                     ],
-                    "default_file": "home.html"
+                    "default_file": "index2.html"
                 },
-                "/uploads": {
+                "/abdou": {
                     "accepted_methods": [
+                        "GET",
                         "POST"
-                    ]
+                    ],
+                    "default_file": "index2.html"
                 },
                 "/cgi-bin/process.php": {
                     "accepted_methods": [

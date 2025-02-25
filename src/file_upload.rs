@@ -62,7 +62,11 @@ pub fn handle_post(request: HttpRequest, error_page: Option<HashMap<u16, String>
                 return HttpResponse::bad_request(error_page);
             };
 
-            return HttpResponse::list_dir(request.path, error_page);
+            return HttpResponse {
+                status_code: 303,
+                headers: vec![("Location".to_string(), "/upload".to_string())],
+                body: Vec::new().into(),
+            };
         }
     }
 

@@ -133,10 +133,11 @@ pub fn handle_route(
 
             if let Some(default_file) = &route.default_file {
                 let path_str = format!("./public/{}", default_file);
+               // let path_str = default_file;
                 let file_path = Path::new(&path_str);
                 if file_path.exists() {
                     if let Some(cgi) = &route.cgi {
-                        let cgi_handler = CGIHandler::new(cgi, &default_file, &request.headers);
+                        let cgi_handler = CGIHandler::new(cgi, &path_str, &request.headers);
                         return match cgi_handler.handle_request(&request) {
                             Ok(output) => HttpResponse::from_cgi_output(output, error_page),
                             Err(_) => HttpResponse::internal_server_error(error_page),

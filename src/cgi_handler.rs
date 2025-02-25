@@ -24,7 +24,7 @@ impl CGIHandler {
         }
     }
 
-    pub fn execute(&self, request_body: &[u8]) -> std::io::Result<Vec<u8>> {
+    pub fn execute(&self, request_body: &[u8]) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
         let full_path = Path::new(&self.script_path);
 
         let mut command = Command::new(&self.cgi_executable);
@@ -32,6 +32,7 @@ impl CGIHandler {
             .arg(&full_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .env("CONTENT_LENGTH", request_body.len().to_string())
             .env("CONTENT_TYPE", "application/x-www-form-urlencoded")
             .env("REQUEST_METHOD", "POST")
@@ -45,10 +46,10 @@ impl CGIHandler {
         }
 
         let output = child.wait_with_output()?;
-        Ok(output.stdout)
+        Ok((output.stdout, output.stderr))
     }
 
-    pub fn handle_request(&self, request: &HttpRequest) -> std::io::Result<Vec<u8>> {
+    pub fn handle_request(&self, request: &HttpRequest) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
         if self.is_chunked {
             self.handle_chunked(&request.body)
         } else {
@@ -56,7 +57,7 @@ impl CGIHandler {
         }
     }
 
-    fn handle_chunked(&self, input: &[u8]) -> std::io::Result<Vec<u8>> {
+    fn handle_chunked(&self, input: &[u8]) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
         let mut reader = std::io::Cursor::new(input);
         let mut body = Vec::new();
 
@@ -76,7 +77,7 @@ impl CGIHandler {
         self.execute(&body)
     }
 
-    fn handle_unchunked(&self, input: &[u8]) -> std::io::Result<Vec<u8>> {
+    fn handle_unchunked(&self, input: &[u8]) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
         self.execute(input)
     }
 }

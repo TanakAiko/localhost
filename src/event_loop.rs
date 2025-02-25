@@ -1,3 +1,4 @@
+use crate::{config::RouteConfig, http_request::HttpRequest, http_response::HttpResponse};
 use std::{
     collections::HashMap,
     io::{Error, Read, Write},
@@ -5,12 +6,10 @@ use std::{
     os::fd::{AsRawFd, RawFd},
 };
 
-use crate::{config::RouteConfig, http_request::HttpRequest, http_response::HttpResponse};
-
 #[derive(Debug)]
 pub struct EventLoop {
     epoll_fd: RawFd,
-    //connections: HashMap<RawFd, TcpStream>,
+    connections: HashMap<RawFd, TcpStream>,
     servers: HashMap<String, Server>,
 }
 
@@ -20,7 +19,7 @@ pub struct Server {
     pub listeners: Vec<RawFd>,
     pub route_map: HashMap<String, RouteConfig>,
     pub error_pages: Option<HashMap<u16, String>>,
-    pub size_limit: Option<usize>
+    pub size_limit: Option<usize>,
 }
 
 impl EventLoop {
@@ -32,7 +31,7 @@ impl EventLoop {
         }
         Ok(Self {
             epoll_fd,
-            //connections: HashMap::new(),
+            connections: HashMap::new(),
             servers: HashMap::new(),
         })
     }
@@ -42,7 +41,7 @@ impl EventLoop {
         server_name: String,
         routes: HashMap<String, RouteConfig>,
         error_pages: Option<HashMap<u16, String>>,
-        size_limit: Option<usize>
+        size_limit: Option<usize>,
     ) {
         if self.servers.contains_key(&server_name) {
             eprintln!(
@@ -59,7 +58,7 @@ impl EventLoop {
                 listeners: Vec::new(),
                 route_map: routes,
                 error_pages,
-                size_limit
+                size_limit,
             },
         );
     }
@@ -71,7 +70,7 @@ impl EventLoop {
         server_name: String,
         routes: HashMap<String, RouteConfig>,
         error_pages: Option<HashMap<u16, String>>,
-        size_limit: Option<usize>
+        size_limit: Option<usize>,
     ) -> std::io::Result<()> {
         let mut event = libc::epoll_event {
             events: (libc::EPOLLIN | libc::EPOLLET) as u32,
@@ -92,7 +91,7 @@ impl EventLoop {
             listeners: Vec::new(),
             route_map: routes,
             error_pages,
-            size_limit
+            size_limit,
         });
 
         //println!("\nlistener.as_raw_fd(): {}", listener.as_raw_fd());
@@ -134,11 +133,33 @@ impl EventLoop {
                     if listener.as_raw_fd() == event_fd {
                         match listener.accept() {
                             Ok((mut stream, _addr)) => {
-                                //println!("New request from: {:?}", addr);
+                                // println!("New request from: {:?}", addr);
                                 //let routes = self.route_map(event_fd);
                                 if let Err(e) = self.handle_connection(&mut stream, event_fd) {
                                     eprintln!("Error handling connection: {:?}", e);
-                                    //self.connections.remove(&event_fd);
+
+                                    // 🔸 Fermer proprement la connexion
+                                    if let Err(shutdown_err) =
+                                        stream.shutdown(std::net::Shutdown::Both)
+                                    {
+                                        eprintln!(
+                                            "Error shutting down connection: {:?}",
+                                            shutdown_err
+                                        );
+                                    }
+
+                                    // 🔸 Supprimer de la liste des connexions suivies
+                                    self.connections.remove(&event_fd);
+
+                                    // 🔸 Désenregistrer de epoll si nécessaire
+                                    unsafe {
+                                        libc::epoll_ctl(
+                                            self.epoll_fd,
+                                            libc::EPOLL_CTL_DEL,
+                                            event_fd,
+                                            std::ptr::null_mut(),
+                                        );
+                                    }
                                 }
                             }
                             Err(e) => eprintln!("Error1: {:?}", e),
@@ -150,69 +171,72 @@ impl EventLoop {
         }
     }
 
-    // Handle the connection
-    fn handle_connection(&mut self, stream: &mut TcpStream, fd: RawFd) -> std::io::Result<()> {
-        //self.add_stream(stream)?;
+        // Handle the connection
+        fn handle_connection(&mut self, stream: &mut TcpStream, fd: RawFd) -> Result<(),std::io::Error> {
+            //self.add_stream(stream)?;
 
-        let mut buffer = Vec::new(); // Utilisation d'un vecteur dynamique pour accumuler les données
-        let mut temp_buffer = [0; 1024];
-        let mut _path = "";
+            let mut buffer = Vec::new(); // Utilisation d'un vecteur dynamique pour accumuler les données
+            let mut temp_buffer = [0; 1024];
+            let mut _path = "";
 
-        // Lire les données initiales (les en-têtes HTTP)
-        let bytes_read = stream.read(&mut temp_buffer)?;
-        buffer.extend_from_slice(&temp_buffer[..bytes_read]);
-
-        // Parse les en-têtes pour obtenir la longueur du corps
-        let request_raw = String::from_utf8_lossy(&buffer);
-        let content_length = Self::parse_content_length(&request_raw).unwrap_or(0);
-
-        // Si un corps est attendu, continuer à lire les données
-        while buffer.len() < content_length {
+            // Lire les données initiales (les en-têtes HTTP)
             let bytes_read = stream.read(&mut temp_buffer)?;
-            if bytes_read == 0 {
-                break;
-            }
             buffer.extend_from_slice(&temp_buffer[..bytes_read]);
+
+            // Parse les en-têtes pour obtenir la longueur du corps
+            let request_raw = String::from_utf8_lossy(&buffer);
+            let content_length = Self::parse_content_length(&request_raw).unwrap_or(0);
+
+            // Si un corps est attendu, continuer à lire les données
+            while buffer.len() < content_length {
+                let bytes_read = stream.read(&mut temp_buffer)?;
+                if bytes_read == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&temp_buffer[..bytes_read]);
+            }
+
+            // Get a new request
+            if let Some(request) = HttpRequest::from_raw(&buffer) {
+                println!(
+                    "\n--------------- New request ---------------\n{:?}\n",
+                    request
+                );
+
+                let hostname = request
+                    .headers
+                    .get("Host")
+                    .map(|h| h.to_string())
+                    .unwrap_or_else(|| "".to_string());
+
+                let routes = Self::route_map(&self, fd, hostname.clone());
+                let error_pages = Self::get_error_pages(&self, fd, hostname.clone());
+                let size_limit = Self::get_size_limit(&self, fd, hostname);
+                // println!("{:?}", routes);
+
+                let response = match routes.get(&request.path) {
+                    Some(route_config) => {
+                        HttpResponse::ok(request, route_config, error_pages, size_limit)
+                    }
+                    None => HttpResponse::get_static(request, error_pages),
+                };
+
+                println!(
+                    "\n--------------- Response ---------------\n{:?}\n",
+                    response.headers
+                );
+                println!("stream {:?}", stream);
+                println!("response.body.len(): {}", response.body.len());
+                stream.write_all(&response.to_bytes())?;
+            } else {
+                //let error_pages = Self::get_error_pages(&self, fd, "".to_string());
+            return  Err(std::io::Error::new(std::io::ErrorKind::Other, "Une erreur s'est produite"));
+            // return eprintln!("Failed to parse request")
+                //stream.write_all(&HttpResponse::bad_request(error_pages).to_bytes())?;
+            }
+
+            Ok(())
         }
-
-        // Get a new request
-        if let Some(request) = HttpRequest::from_raw(&buffer) {
-            println!(
-                "\n--------------- New request ---------------\n{:?}\n",
-                request
-            );
-
-            let hostname = request
-                .headers
-                .get("Host")
-                .map(|h| h.to_string())
-                .unwrap_or_else(|| "".to_string());
-
-            let routes = Self::route_map(&self, fd, hostname.clone());
-            let error_pages = Self::get_error_pages(&self, fd, hostname.clone());
-            let size_limit = Self::get_size_limit(&self, fd, hostname);
-            // println!("{:?}", routes);
-            
-            let response = match routes.get(&request.path) {
-                Some(route_config) => HttpResponse::ok(request, route_config, error_pages, size_limit),
-                None => HttpResponse::get_static(request, error_pages),
-            };
-
-            println!(
-                "\n--------------- Response ---------------\n{:?}\n",
-                response.headers
-            );
-
-            println!("response.body.len(): {}", response.body.len());
-            stream.write_all(&response.to_bytes())?;
-        } else {
-            let error_pages = Self::get_error_pages(&self, fd, "".to_string());
-            eprintln!("Failed to parse request");
-            stream.write_all(&HttpResponse::bad_request(error_pages).to_bytes())?;
-        }
-
-        Ok(())
-    } 
 
     fn route_map(&self, fd: RawFd, hostname: String) -> HashMap<String, RouteConfig> {
         let host = hostname.split_once(":").unwrap_or(("", "")).0;
@@ -262,7 +286,7 @@ impl EventLoop {
             .values()
             .find(|server| server.name.to_lowercase() == host)
         {
-            return server.size_limit.clone()
+            return server.size_limit.clone();
         }
 
         // Recherche par descripteur de fichier (fd)

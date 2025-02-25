@@ -4,6 +4,7 @@ use std::{
     path::Path,
     time::SystemTime,
 };
+use crate::session::SessionManager;
 
 use urlencoding::decode;
 
@@ -68,7 +69,9 @@ impl HttpResponse {
     ) -> Self {
         let methodes = match route_config.accepted_methods.clone() {
             Some(methode) => methode,
-            None => return Self::bad_request(error_page),
+            None => {
+                return Self::bad_request(error_page)
+            },
         };
 
         if !methodes.contains(&request.method) {
@@ -82,8 +85,19 @@ impl HttpResponse {
         }
     }
 
-    pub fn from_cgi_output(output: Vec<u8>, error_page: Option<HashMap<u16, String>>) -> Self {
-        match String::from_utf8(output) {
+    pub fn from_cgi_output(output: (Vec<u8>, Vec<u8>), error_page: Option<HashMap<u16, String>>) -> Self {
+        let (stdout, stderr) = output;
+        if !stderr.is_empty() {
+            match String::from_utf8(stderr) {
+                Ok(body) => HttpResponse {
+                    status_code: 200,
+                    headers: vec![("Content-Type".to_string(), "text/html".to_string())],
+                    body: body.into(),
+                },
+                Err(_) => HttpResponse::internal_server_error(error_page),
+            }
+        } else {
+        match String::from_utf8(stdout) {
             Ok(body) => HttpResponse {
                 status_code: 200,
                 headers: vec![("Content-Type".to_string(), "text/html".to_string())],
@@ -92,6 +106,7 @@ impl HttpResponse {
             Err(_) => HttpResponse::internal_server_error(error_page),
         }
     }
+}
     //im handling post here
     pub fn handle_post_response(
         request: HttpRequest,
