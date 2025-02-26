@@ -4,7 +4,6 @@ use std::{
     path::Path,
     time::SystemTime,
 };
-use crate::session::SessionManager;
 
 use urlencoding::decode;
 
@@ -43,7 +42,7 @@ impl HttpResponse {
     }
 
     pub fn with_session(mut self, session: &Session) -> Self {
-        // Ajouter ou mettre à jour le cookie de session
+        // Add or update the session cookie
         self.set_cookie("session_id", &session.id, Some(session.expires_at));
         self
     }
@@ -58,13 +57,6 @@ impl HttpResponse {
 
     pub fn get_static(request: HttpRequest, error_page: Option<HashMap<u16, String>>) -> Self {
         if let Some((mime_type, content)) = Self::serve_static_file(&request.path) {
-            //println!("content.len(): {:?}", content.len());
-
-            // let name = format!("output.{}", mime_type.split_once("/").unwrap().1);
-            // println!("name: {}", name);
-            // let mut file = File::create(name).unwrap();
-            // file.write_all(&content).unwrap();
-
             return Self {
                 status_code: 200,
                 headers: vec![
@@ -86,12 +78,9 @@ impl HttpResponse {
         error_page: Option<HashMap<u16, String>>,
         size_limit: Option<usize>,
     ) -> Self {
-        println!("request.path: {}", request.path);
         let methodes = match route_config.accepted_methods.clone() {
             Some(methode) => methode,
-            None => {
-                return Self::bad_request(error_page)
-            },
+            None => return Self::bad_request(error_page),
         };
 
         if !methodes.contains(&request.method) {
@@ -105,7 +94,10 @@ impl HttpResponse {
         }
     }
 
-    pub fn from_cgi_output(output: (Vec<u8>, Vec<u8>), error_page: Option<HashMap<u16, String>>) -> Self {
+    pub fn from_cgi_output(
+        output: (Vec<u8>, Vec<u8>),
+        error_page: Option<HashMap<u16, String>>,
+    ) -> Self {
         let (stdout, stderr) = output;
         if !stderr.is_empty() {
             match String::from_utf8(stderr) {
@@ -117,17 +109,17 @@ impl HttpResponse {
                 Err(_) => HttpResponse::internal_server_error(error_page),
             }
         } else {
-        match String::from_utf8(stdout) {
-            Ok(body) => HttpResponse {
-                status_code: 200,
-                headers: vec![("Content-Type".to_string(), "text/html".to_string())],
-                body: body.into(),
-            },
-            Err(_) => HttpResponse::internal_server_error(error_page),
+            match String::from_utf8(stdout) {
+                Ok(body) => HttpResponse {
+                    status_code: 200,
+                    headers: vec![("Content-Type".to_string(), "text/html".to_string())],
+                    body: body.into(),
+                },
+                Err(_) => HttpResponse::internal_server_error(error_page),
+            }
         }
     }
-}
-    //im handling post here
+
     pub fn handle_post_response(
         request: HttpRequest,
         error_page: Option<HashMap<u16, String>>,
@@ -146,7 +138,7 @@ impl HttpResponse {
     }
 
     // Generate a forbidden_response (403 Forbidden)
-    //  Le serveur a compris la requête, mais refuse de l'exécuter à cause d'un manque de permissions.
+    //  The server understood the request, but refuses to execute it because of a lack of permissions.
     pub fn forbidden(error_page: Option<HashMap<u16, String>>) -> Self {
         Self::error_template(403, "Forbidden", error_page)
     }
@@ -157,19 +149,24 @@ impl HttpResponse {
     }
 
     // Generate a method_not_allowed_response (405 Method Not Allowed)
-    //  La méthode HTTP utilisée (GET, POST, PUT, DELETE, etc.) n'est pas autorisée pour cette ressource.
+    //  The HTTP method used (Get, Post, Put, Delete, etc.) is not allowed for this resource.
     pub fn method_not_allowed(error_page: Option<HashMap<u16, String>>) -> Self {
         Self::error_template(405, "Method Not Allowed", error_page)
     }
 
+    // Generate a service_unavailable_response (503 Service Unavailable)
+    pub fn service_unavailable(error_page: Option<HashMap<u16, String>>) -> Self {
+        Self::error_template(503, "Service Unavailable", error_page)
+    }
+
     // Generate a payload_too_large_response (413 Payload Too Large)
-    // La taille du corps de la requête dépasse les limites acceptées par le serveur.
+    // The size of the request body exceeds the limits accepted by the server.
     pub fn payload_too_large(error_page: Option<HashMap<u16, String>>) -> Self {
         Self::error_template(413, "Payload Too Large", error_page)
     }
 
     // Generate a internal_server_error_response (500 Internal Server Error)
-    // Une erreur générique lorsque le serveur rencontre un problème inattendu.
+    // A generic error when the server encounters an unexpected problem.
     pub fn internal_server_error(error_page: Option<HashMap<u16, String>>) -> Self {
         Self::error_template(500, "Internal Server Error", error_page)
     }
@@ -190,18 +187,19 @@ impl HttpResponse {
                 }
             }
         }
-        // Lire le fichier HTML
+
+        // Read the HTML file
         let template = match fs::read_to_string("./public/error.html") {
             Ok(temp) => temp,
             Err(_) => return Self::internal_server_error(error_page),
         };
 
-        // Remplacer les espaces réservés
+        // Replace the reserved spaces
         let body = template
             .replace("{{status_code}}", &status_code.to_string())
             .replace("{{message}}", message);
 
-        // Créer la réponse HTTP
+        // Create the HTTP response
         Self {
             status_code,
             headers: vec![
@@ -226,7 +224,7 @@ impl HttpResponse {
         let script = r#"
             <script>
             function deleteFile(filePath) {
-                if (confirm("Êtes-vous sûr de vouloir supprimer ce fichier?")) {
+                if (confirm("Are you sure you want to delete this file?")) {
                     fetch('/delete', {
                         method: 'DELETE',
                         headers: {
@@ -322,20 +320,6 @@ impl HttpResponse {
                             file_name,
                             buton
                         ));
-                        // content.push_str(&format!(
-                        //     "
-                        //     <div class=\"file-info\">
-                        //     <div class=\"file-icon image-file\">
-                        // 	<i class=\"fas fa-image\"></i>
-                        //     </div>
-                        //         <span [File] class=\"file-name\"> <a href=\"{}/{}\">{}</a>{}</span>
-                        //      </div>
-                        //     ",
-                        //     dir.trim_start_matches("/"),
-                        //     file_name,
-                        //     file_name,
-                        //     buton
-                        // ));
                     }
                 }
                 content
@@ -350,9 +334,7 @@ impl HttpResponse {
         path: &str,
         error_page: Option<HashMap<u16, String>>,
     ) -> Self {
-        println!("path: {}", path);
         let real_path = format!("./public/{}", path);
-        println!("real_path: {}", real_path);
         let body = match fs::read_to_string(real_path) {
             Ok(temp) => temp,
             Err(_) => return Self::internal_server_error(error_page),
@@ -400,6 +382,7 @@ impl HttpResponse {
             405 => "Method Not Allowed",
             413 => "Payload Too Large",
             500 => "Internal Server Error",
+            503 => "Service Unavailable",
             _ => "Unknown",
         }
     }
@@ -411,7 +394,6 @@ impl HttpResponse {
         };
 
         let file_path = format!("public{}", decoded_path);
-        println!("file_path: '{}'", file_path);
 
         if Path::new(&file_path).exists() {
             let content = fs::read(&file_path).ok()?;
@@ -438,7 +420,7 @@ impl HttpResponse {
             } else if path.ends_with(".xls") || path.ends_with(".xlsx") {
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             } else {
-                "application/octet-stream" // Type par défaut pour les fichiers inconnus
+                "application/octet-stream" // Default type for unknown files
             };
             Some((mime_type.to_string(), content))
         } else {

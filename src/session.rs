@@ -12,7 +12,6 @@ pub struct Session {
     pub data: HashMap<String, String>,
     pub created_at: SystemTime,
     pub expires_at: SystemTime,
-    // Ajout de nouvelles propriétés pour le stateful
     pub keep_alive: bool,
     pub last_activity: SystemTime,
     pub connection_state: ConnectionState,
@@ -77,7 +76,7 @@ impl SessionManager {
     pub fn get_default_routes() -> HashMap<String, RouteConfig> {
         let mut routes: HashMap<String, RouteConfig> = HashMap::new();
 
-        // Route pour la page de création de session
+        // Road for the session creation page
         routes.insert(
             "/session".to_string(),
             RouteConfig {
@@ -89,7 +88,7 @@ impl SessionManager {
             },
         );
 
-        // Route pour l'action de création de session
+        // Road for the session creation action
         routes.insert(
             "/create-session".to_string(),
             RouteConfig {

@@ -1,6 +1,9 @@
-use crate::{config::RouteConfig, http_request::HttpRequest, http_response::HttpResponse};
+use crate::{
+    config::RouteConfig, http_request::HttpRequest, http_response::HttpResponse,
+    request_queue::RequestQueue,
+};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     io::{Error, Read, Write},
     net::{TcpListener, TcpStream},
     os::fd::{AsRawFd, RawFd},
@@ -8,10 +11,9 @@ use std::{
 
 #[derive(Debug)]
 pub struct EventLoop {
-    epoll_fd: RawFd,
-    connections: HashMap<RawFd, TcpStream>,
-    servers: HashMap<String, Server>,
-    request_queues: HashMap<RawFd, RequestQueue>,
+    pub epoll_fd: RawFd,
+    pub servers: HashMap<String, Server>,
+    pub request_queues: HashMap<RawFd, RequestQueue>,
 }
 
 #[derive(Debug)]
@@ -23,56 +25,17 @@ pub struct Server {
     pub size_limit: Option<usize>,
 }
 
-#[derive(Debug)]
-struct RequestQueue {
-    requests: VecDeque<HttpRequest>,
-    max_queued: usize,
-}
-
-impl RequestQueue {
-    fn new(max_queued: usize) -> Self {
-        Self {
-            requests: VecDeque::new(),
-            max_queued,
-        }
-    }
-
-    fn push(&mut self, request: HttpRequest) -> Result<(), HttpResponse> {
-        if self.requests.len() >= self.max_queued {
-            return Err(HttpResponse::internal_server_error(None));
-        }
-        self.requests.push_back(request);
-        Ok(())
-    }
-
-    fn pop(&mut self) -> Option<HttpRequest> {
-        self.requests.pop_front()
-    }
-}
-
 impl EventLoop {
-    // Create a new server
-    /* pub fn new() -> std::io::Result<Self> {
+    pub fn new() -> std::io::Result<Self> {
         let epoll_fd = unsafe { libc::epoll_create1(0) };
         if epoll_fd < 0 {
             return Err(std::io::Error::last_os_error());
         }
         Ok(Self {
             epoll_fd,
-            connections: HashMap::new(),
             servers: HashMap::new(),
+            request_queues: HashMap::new(),
         })
-    } */
-
-    // Vérifier l'état des queues
-    fn check_queues(&self) -> usize {
-        self.request_queues.values().map(|q| q.requests.len()).sum()
-    }
-
-    // Nettoyer les queues inactives
-    fn cleanup_queues(&mut self) {
-        self.request_queues
-            .retain(|_, queue| !queue.requests.is_empty());
     }
 
     pub fn add_server(
@@ -133,11 +96,7 @@ impl EventLoop {
             size_limit,
         });
 
-        //println!("\nlistener.as_raw_fd(): {}", listener.as_raw_fd());
         server.listeners.push(listener.as_raw_fd());
-        //println!("server.listeners: {:?}\n", server.listeners);
-
-        //self.listeners.insert(listener.as_raw_fd(), routes);
 
         if res < 0 {
             Err(std::io::Error::last_os_error())
@@ -151,9 +110,6 @@ impl EventLoop {
         let mut events = vec![libc::epoll_event { events: 0, u64: 0 }; 1024];
 
         loop {
-            // for ser in self.servers.iter() {
-            //     println!("\n\nServer: \n{:?}\n\n", ser);
-            // }
             let num_events = unsafe {
                 libc::epoll_wait(self.epoll_fd, events.as_mut_ptr(), events.len() as i32, -1)
             };
@@ -167,36 +123,19 @@ impl EventLoop {
                 let event_fd = event.u64 as RawFd;
 
                 for listener in listeners_list.iter() {
-                    //let listener_fd = listener.as_raw_fd();
-                    //println!("listener_fd: {} - event_fd: {}", listener_fd, event_fd);
                     if listener.as_raw_fd() == event_fd {
                         match listener.accept() {
                             Ok((mut stream, _addr)) => {
-                                // println!("New request from: {:?}", addr);
-                                //let routes = self.route_map(event_fd);
                                 if let Err(e) = self.handle_connection(&mut stream, event_fd) {
                                     eprintln!("Error handling connection: {:?}", e);
 
-                                    // 🔸 Fermer proprement la connexion
+                                    // 🔸 Close the connection
                                     if let Err(shutdown_err) =
                                         stream.shutdown(std::net::Shutdown::Both)
                                     {
                                         eprintln!(
                                             "Error shutting down connection: {:?}",
                                             shutdown_err
-                                        );
-                                    }
-
-                                    // 🔸 Supprimer de la liste des connexions suivies
-                                    self.connections.remove(&event_fd);
-
-                                    // 🔸 Désenregistrer de epoll si nécessaire
-                                    unsafe {
-                                        libc::epoll_ctl(
-                                            self.epoll_fd,
-                                            libc::EPOLL_CTL_DEL,
-                                            event_fd,
-                                            std::ptr::null_mut(),
                                         );
                                     }
                                 }
@@ -210,73 +149,6 @@ impl EventLoop {
         }
     }
 
-    // Handle the connection
-    /*     fn handle_connection(&mut self, stream: &mut TcpStream, fd: RawFd) -> std::io::Result<()> {
-           //self.add_stream(stream)?;
-
-           let mut buffer = Vec::new(); // Utilisation d'un vecteur dynamique pour accumuler les données
-           let mut temp_buffer = [0; 1024];
-           let mut _path = "";
-
-           // Lire les données initiales (les en-têtes HTTP)
-           let bytes_read = stream.read(&mut temp_buffer)?;
-           buffer.extend_from_slice(&temp_buffer[..bytes_read]);
-
-           // Parse les en-têtes pour obtenir la longueur du corps
-           let request_raw = String::from_utf8_lossy(&buffer);
-           let content_length = Self::parse_content_length(&request_raw).unwrap_or(0);
-
-           // Si un corps est attendu, continuer à lire les données
-           while buffer.len() < content_length {
-               let bytes_read = stream.read(&mut temp_buffer)?;
-               if bytes_read == 0 {
-                   break;
-               }
-               buffer.extend_from_slice(&temp_buffer[..bytes_read]);
-           }
-
-           // Get a new request
-           if let Some(request) = HttpRequest::from_raw(&buffer, fd) {
-               println!(
-                   "\n--------------- New request ---------------\n{:?}\n",
-                   request
-               );
-
-               let hostname = request
-                   .headers
-                   .get("Host")
-                   .map(|h| h.to_string())
-                   .unwrap_or_else(|| "".to_string());
-
-               let routes = Self::route_map(&self, fd, hostname.clone());
-               let error_pages = Self::get_error_pages(&self, fd, hostname.clone());
-               let size_limit = Self::get_size_limit(&self, fd, hostname);
-               // println!("{:?}", routes);
-
-               let response = match routes.get(&request.path) {
-                   Some(route_config) => {
-                       HttpResponse::ok(request, route_config, error_pages, size_limit)
-                   }
-                   None => HttpResponse::get_static(request, error_pages),
-               };
-
-               println!(
-                   "\n--------------- Response ---------------\n{:?}\n",
-                   response.headers
-               );
-
-               println!("response.body.len(): {}", response.body.len());
-               stream.write_all(&response.to_bytes())?;
-           } else {
-               let error_pages = Self::get_error_pages(&self, fd, "".to_string());
-               eprintln!("Failed to parse request");
-               stream.write_all(&HttpResponse::bad_request(error_pages).to_bytes())?;
-           }
-
-           Ok(())
-       }
-    */
-
     fn route_map(&self, fd: RawFd, hostname: String) -> HashMap<String, RouteConfig> {
         let host = hostname.split_once(":").unwrap_or(("", "")).0;
 
@@ -285,11 +157,9 @@ impl EventLoop {
             .values()
             .find(|server| server.name.to_lowercase() == host)
         {
-            //println!("routes from host");
             return server.route_map.clone();
         }
 
-        //println!("routes from fd");
         self.servers
             .values()
             .find(|server| server.listeners.contains(&fd))
@@ -335,71 +205,6 @@ impl EventLoop {
             .and_then(|server| server.size_limit.clone())
     }
 
-    // Fonction pour extraire la longueur du contenu des en-têtes HTTP
-    fn parse_content_length(request: &str) -> Option<usize> {
-        for line in request.lines() {
-            if let Some(value) = line.strip_prefix("Content-Length: ") {
-                return value.trim().parse().ok();
-            }
-        }
-        None
-    }
-
-    fn read_request(&self, stream: &mut TcpStream, listener_fd: RawFd) -> std::io::Result<HttpRequest> {
-        let mut buffer = Vec::new();
-        let mut temp_buffer = [0; 1024];
-
-        // Lecture initiale pour les en-têtes
-        let bytes_read = stream.read(&mut temp_buffer)?;
-        if bytes_read == 0 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::UnexpectedEof,
-                "Connection closed by peer",
-            ));
-        }
-        buffer.extend_from_slice(&temp_buffer[..bytes_read]);
-
-        // Parse les en-têtes pour obtenir la longueur du corps
-        let new_buff = buffer.clone();
-        let request_raw = String::from_utf8_lossy(&new_buff);
-        let content_length = Self::parse_content_length(&request_raw).unwrap_or(0);
-
-        // Continue la lecture si un corps est attendu
-        while buffer.len() < content_length + request_raw.find("\r\n\r\n").unwrap_or(0) + 4 {
-            let bytes_read = stream.read(&mut temp_buffer)?;
-            if bytes_read == 0 {
-                break;
-            }
-            buffer.extend_from_slice(&temp_buffer[..bytes_read]);
-        }
-
-        match HttpRequest::from_raw(&buffer, listener_fd) {
-            Some(request) => Ok(request),
-            None => Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Invalid HTTP request",
-            )),
-        }
-    }
-
-    fn check_connection_headers(&self, request: &HttpRequest) -> bool {
-        let connection_header = request.headers.get("Connection").map(|h| h.to_lowercase());
-
-        match connection_header {
-            Some(header) => {
-                if header == "close" {
-                    false
-                } else if header == "keep-alive" {
-                    true
-                } else {
-                    // Par défaut en HTTP/1.1, la connexion est keep-alive
-                    request.version == "HTTP/1.1"
-                }
-            }
-            None => request.version == "HTTP/1.1", // Keep-alive par défaut en HTTP/1.1
-        }
-    }
-
     fn process_request(&mut self, request: HttpRequest) -> HttpResponse {
         let hostname = request
             .headers
@@ -407,104 +212,121 @@ impl EventLoop {
             .map(|h| h.to_string())
             .unwrap_or_default();
 
-        // println!("hostname: {:?}", hostname);
-        // println!("request.fd: {:?}", request.fd);
-        // println!("self: {:?}", self);
+        let routes = Self::route_map(&self, request.listener_fd, hostname.clone());
+        let error_pages = Self::get_error_pages(&self, request.listener_fd, hostname.clone());
+        let size_limit = Self::get_size_limit(&self, request.listener_fd, hostname);
 
-        let routes = Self::route_map(&self, request.fd, hostname.clone());
-        let error_pages = Self::get_error_pages(&self, request.fd, hostname.clone());
-        let size_limit = Self::get_size_limit(&self, request.fd, hostname);
-
-        println!("routes: {:?}", routes);
-        println!("request.path: {:?}", request.path);
         match routes.get(&request.path) {
             Some(route_config) => HttpResponse::ok(request, route_config, error_pages, size_limit),
             None => HttpResponse::get_static(request, error_pages),
         }
     }
 
-    
+    fn handle_connection(
+        &mut self,
+        stream: &mut TcpStream,
+        listener_fd: RawFd,
+    ) -> std::io::Result<()> {
+        let stream_fd = stream.as_raw_fd();
 
-    // Mise à jour du handle_connection pour utiliser les nouvelles fonctions
-    pub fn new() -> std::io::Result<Self> {
-        let epoll_fd = unsafe { libc::epoll_create1(0) };
-        if epoll_fd < 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        Ok(Self {
-            epoll_fd,
-            servers: HashMap::new(),
-            request_queues: HashMap::new(),
-        })
-    }
-
-    // 3. Modifiez handle_connection pour utiliser la queue
-    fn handle_connection(&mut self, stream: &mut TcpStream, fd: RawFd) -> std::io::Result<()> {
-        println!("handle_connection -------------");
-        // Créer une nouvelle queue si elle n'existe pas
-        if !self.request_queues.contains_key(&fd) {
-            self.request_queues.insert(fd, RequestQueue::new(100)); // 100 est la taille max de la queue
+        // Create a new tail if it does not exist
+        if !self.request_queues.contains_key(&stream_fd) {
+            self.request_queues
+                .insert(stream_fd, RequestQueue::new(100)); // 100 est la taille max de la queue
         }
 
         let mut keep_alive = true;
 
+        println!("\n*******************New Connection*******************",);
+
         while keep_alive {
-            stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))?;
+            stream.set_read_timeout(Some(std::time::Duration::from_millis(500)))?;
 
-            // Lire la requête et l'ajouter à la queue
-            match self.read_request(stream, fd) {
+            // Read the request and add it to the tail
+            match read_request(stream, listener_fd) {
                 Ok(request) => {
-                    // println!("Request OOOOKKKKKKKKKKKKKKKKKKK: {:?}", request);
-                    keep_alive = self.check_connection_headers(&request);
-                    println!("keep_alive: 1");
-                    // Traiter la requête immédiatement au lieu d'utiliser une queue
+                    println!(
+                        "-----------------New Request-----------------\n{:?}\n",
+                        request
+                    );
+                    keep_alive = check_connection_headers(&request);
+
+                    // Treat the request immediately instead of using a tail
                     let mut requests_to_process = Vec::new();
-                    println!("keep_alive: 2");
 
-                    
-                    // Collecter les requêtes de la queue
-                    if let Some(queue) = self.request_queues.get_mut(&fd) {
-                    println!("keep_alive: 3");
-
+                    // Collect tail requests
+                    if let Some(queue) = self.request_queues.get_mut(&stream_fd) {
                         if queue.push(request).is_ok() {
-                    println!("keep_alive: 6");
-
                             while let Some(req) = queue.pop() {
                                 requests_to_process.push(req);
                             }
                         } else {
-                            // La queue est pleine
-                            let error_response = HttpResponse::internal_server_error(None);
+                            let error_response = HttpResponse::service_unavailable(None);
                             stream.write_all(&error_response.to_bytes())?;
                             keep_alive = false;
                             continue;
                         }
                     }
-                    println!("keep_alive: 4");
 
-    
-                    // Traiter toutes les requêtes collectées
+                    // Treat all requests collected
                     for req in requests_to_process {
                         let response = self.process_request(req);
                         let final_response = add_connection_headers(response, keep_alive);
                         stream.write_all(&final_response.to_bytes())?;
                     }
-                    println!("keep_alive: 5");
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    println!("Timeout de lecture de la requête");
+                    // println!("Timeout's over");
                     keep_alive = false;
                 }
                 Err(e) => {
-                    eprintln!("Erreur de lecture de la requête: {:?}", e);
+                    eprintln!("Reading error of the request: {:?}", e);
+                    self.request_queues.remove(&stream_fd);
                     return Err(e);
                 }
             }
         }
 
-        // Nettoyer la queue quand la connexion est fermée
-        self.request_queues.remove(&fd);
+        // Clean the tail when the connection is closed
+        self.request_queues.remove(&stream_fd);
         Ok(())
+    }
+}
+
+fn read_request(stream: &mut TcpStream, listener_fd: RawFd) -> std::io::Result<HttpRequest> {
+    let mut buffer = Vec::new();
+    let mut temp_buffer = [0; 1024];
+
+    // Initial reading for headers
+    let bytes_read = stream.read(&mut temp_buffer)?;
+    if bytes_read == 0 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "Connection closed by peer",
+        ));
+    }
+    buffer.extend_from_slice(&temp_buffer[..bytes_read]);
+
+    // Sprinkle the headers to obtain the length of the body
+    let new_buff = buffer.clone();
+    let request_raw = String::from_utf8_lossy(&new_buff);
+    let content_length = parse_content_length(&request_raw).unwrap_or(0);
+
+    // Continue reading if a body is expected
+    while buffer.len() < content_length + request_raw.find("\r\n\r\n").unwrap_or(0) + 4 {
+        let bytes_read = stream.read(&mut temp_buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&temp_buffer[..bytes_read]);
+    }
+
+    match HttpRequest::from_raw(&buffer, listener_fd, stream.as_raw_fd()) {
+        Some(request) => Ok(request),
+        None => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Invalid HTTP request",
+        )),
     }
 }
 
@@ -521,4 +343,32 @@ fn add_connection_headers(mut response: HttpResponse, keep_alive: bool) -> HttpR
     }
 
     response
+}
+
+fn check_connection_headers(request: &HttpRequest) -> bool {
+    let connection_header = request.headers.get("Connection").map(|h| h.to_lowercase());
+
+    match connection_header {
+        Some(header) => {
+            if header == "close" {
+                false
+            } else if header == "keep-alive" {
+                true
+            } else {
+                // Par défaut en HTTP/1.1, la connexion est keep-alive
+                request.version == "HTTP/1.1"
+            }
+        }
+        None => request.version == "HTTP/1.1", // Keep-alive par défaut en HTTP/1.1
+    }
+}
+
+// Function to extract the length of the content of the HTTP headers
+fn parse_content_length(request: &str) -> Option<usize> {
+    for line in request.lines() {
+        if let Some(value) = line.strip_prefix("Content-Length: ") {
+            return value.trim().parse().ok();
+        }
+    }
+    None
 }

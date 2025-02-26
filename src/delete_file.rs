@@ -9,13 +9,9 @@ pub fn handle_delete(
     request: HttpRequest,
     error_page: Option<std::collections::HashMap<u16, String>>,
 ) -> HttpResponse {
-    // println!("******\nrequest: {:?}", request);
     let body_text = String::from_utf8_lossy(&request.body);
-    println!("Body as text: '{}'", body_text);
-    // On suppose que le chemin demandé correspond au chemin relatif dans le répertoire "./public".
-    // Par exemple, pour une requête DELETE sur "/uploads/file.txt", on cherchera "./public/uploads/file.txt".
-
-    // Parser le JSON contenu dans le body
+    
+    // Set the json contained in the body
     let json_body: Value = match serde_json::from_str(&body_text) {
         Ok(val) => val,
         Err(e) => {
@@ -24,7 +20,7 @@ pub fn handle_delete(
         }
     };
 
-    // Extraire la valeur associée à la clé "path"
+    // Extract the value associated with the "path" key
     let file_name = match json_body.get("path").and_then(|v| v.as_str()) {
         Some(name) => name,
         None => {
@@ -33,17 +29,15 @@ pub fn handle_delete(
         }
     };
 
-    println!("file_name: {}", file_name);
-
     let base_dir = Path::new("./public/upload");
     let file_path = base_dir.join(file_name);
 
-    // Vérifier que le fichier existe et qu'il s'agit bien d'un fichier (et non d'un dossier)
+    // Check that the file exists and that it is indeed a file (and not a folder)
     if !file_path.exists() || !file_path.is_file() {
         return HttpResponse::not_found(error_page);
     }
 
-    // Tenter de supprimer le fichier
+    // Try to delete the file
     match fs::remove_file(&file_path) {
         Ok(_) => {
             HttpResponse {
@@ -58,7 +52,8 @@ pub fn handle_delete(
                 file_path.display(),
                 err
             );
-            // En cas d'erreur, on peut renvoyer un 403 (si problème de permission) ou un 500.
+            
+            // In the event of an error, you can return a 403 (if permission problem) or a 500.
             if err.kind() == std::io::ErrorKind::PermissionDenied {
                 HttpResponse::forbidden(error_page)
             } else {
