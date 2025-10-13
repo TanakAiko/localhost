@@ -3,7 +3,7 @@
         {
             "name": "server1",
             "client_body_size_limit": 1048576,
-            "addr": "172.29.168.139",
+            "addr": "127.0.0.1",
             "ports": [
                 "8080",
                 "8081"
@@ -73,7 +73,7 @@
         {
             "name": "server2",
             "client_body_size_limit": 5242880,
-            "addr": "172.29.168.139",
+            "addr": "127.0.0.1",
             "ports": [
                 "8082",
                 "8080"
@@ -86,7 +86,7 @@
                     "accepted_methods": [
                         "GET"
                     ],
-                    "default_file": "index2.html"
+                    "default_file": "index.html"
                 },
                 "/abdou": {
                     "accepted_methods": [

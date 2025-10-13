@@ -15,7 +15,7 @@ fn handle_session(
     session_id: Option<String>,
     request: &HttpRequest,
 ) -> Result<String, HttpResponse> {
-    // Ne pas vérifier la session pour ces routes spécifiques
+    // Do not check the session for these specific routes
     let public_paths = vec!["/session", "/create-session"];
     if public_paths.contains(&request.path.as_str()) {
         return Ok(String::new());
@@ -24,11 +24,11 @@ fn handle_session(
     match session_id {
         Some(id) => {
             if let Some(sess) = session_manager.get_session_mut(&id) {
-                // Session valide - renouveler
+                // Valid session - renew
                 sess.expires_at = SystemTime::now() + Duration::from_secs(3600);
                 Ok(id)
             } else {
-                // Session invalide - rediriger
+                // Invalid session - Redirect
                 Err(HttpResponse {
                     status_code: 302,
                     headers: vec![
@@ -43,7 +43,7 @@ fn handle_session(
             }
         }
         None => {
-            // Pas de session - rediriger
+            // No session - Redirect
             Err(HttpResponse {
                 status_code: 302,
                 headers: vec![("Location".to_string(), "/session".to_string())],
@@ -58,16 +58,14 @@ pub fn handle_route(
     request: HttpRequest,
     error_page: Option<HashMap<u16, String>>,
 ) -> HttpResponse {
-    println!("///////////////////////////////////////////////////session_route");
-
     let mut session_manager = SessionManager::global()
         .lock()
         .expect("Failed to lock session manager");
 
-    // Obtenir les routes de session
+    // Get the session roads
     let session_routes = SessionManager::get_default_routes();
 
-    // Vérifier si c'est une route de session
+    // Check if it's a session route
     if let Some(session_route) = session_routes.get(&request.path) {
         if request.path == "/create-session" && request.method == "POST" {
             let session_id = session_manager.create_session();
@@ -83,7 +81,7 @@ pub fn handle_route(
                 body: Vec::new(),
             };
         } else {
-            // Pour /session
+            // For /session
             return HttpResponse::page_server(
                 200,
                 session_route
@@ -95,23 +93,7 @@ pub fn handle_route(
         }
     }
 
-    // Gestion spéciale pour la création de session
-    /* if request.path == "/create-session" && request.method == "POST" {
-        let session_id = session_manager.create_session();
-        return HttpResponse {
-            status_code: 302,
-            headers: vec![
-                ("Location".to_string(), "/".to_string()),
-                (
-                    "Set-Cookie".to_string(),
-                    format!("session_id={}; Path=/", session_id),
-                ),
-            ],
-            body: Vec::new(),
-        };
-    } */
-
-    // Vérification de la session pour toutes les autres routes
+    // Verification of the session for all other roads
     let session_id = request.get_cookies().get("session_id").cloned();
     match handle_session(&mut session_manager, session_id, &request) {
         Ok(_) => {
@@ -133,7 +115,6 @@ pub fn handle_route(
 
             if let Some(default_file) = &route.default_file {
                 let path_str = format!("./public/{}", default_file);
-               // let path_str = default_file;
                 let file_path = Path::new(&path_str);
                 if file_path.exists() {
                     if let Some(cgi) = &route.cgi {
@@ -145,12 +126,6 @@ pub fn handle_route(
                     }
 
                     let response = HttpResponse::page_server(200, &default_file, error_page);
-                    // let mut session_id = request.get_cookies().get("session_id").cloned();
-                    // let id = session_id.clone().unwrap_or(String::new());
-                    // if id.is_empty() {
-                    //     session_id = None;
-                    // }
-                    // handle_session(&mut session_manager, session_id, &request);
                     return response;
                 } else {
                     println!("file_path.exists() === false")
@@ -159,7 +134,6 @@ pub fn handle_route(
 
             println!("Not found (handle_route)");
             HttpResponse::not_found(error_page)
-            // ... reste du code ...
         }
         Err(redirect_response) => redirect_response,
     }
